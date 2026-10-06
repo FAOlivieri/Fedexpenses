@@ -1,0 +1,12 @@
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+
+# Personal data and secrets: never commit
+Transactions *.csv
+*.jks
+*.keystore

@@ -1,0 +1,283 @@
+Date, Category, Amount, Note, Account, Seller
+10/5/2026, Services, -24.99, Internet + phone, Personal, Telekom
+10/5/2026, Eating Out, -1.60, , Personal, Café Central
+10/5/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+10/3/2026, Groceries, -43.67, , Personal, Mercator
+10/3/2026, Going Out, -24.32, Concert, Personal, 
+10/2/2026, Eating Out, -1.60, , Personal, Kebab House
+10/2/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+10/1/2026, Housing, -650.00, Rent, Personal, Landlord
+10/1/2026, Salary, 2450.00, Monthly salary, Bank, ACME d.o.o.
+10/1/2026, Eating Out, -3.50, , Personal, Kebab House
+10/1/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+10/1/2026, Transport, -42.69, Fuel, Personal, Petrol
+9/30/2026, Eating Out, -8.90, , Personal, Kebab House
+9/30/2026, Shopping, -114.52, Kitchen stuff, Personal, IKEA
+9/29/2026, Groceries, -53.08, , Personal, Spar
+9/28/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+9/26/2026, Groceries, -29.63, , Personal, Spar
+9/25/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+9/22/2026, Groceries, -71.67, , Personal, Spar
+9/22/2026, Eating Out, -8.90, , Personal, Pizzeria Napoli
+9/21/2026, Eating Out, -8.90, , Personal, Pizzeria Napoli
+9/21/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+9/20/2026, Housing, -54.02, Electricity, Personal, Energy Co
+9/19/2026, Groceries, -25.35, , Personal, Lidl
+9/18/2026, Eating Out, -11.50, , Personal, Pizzeria Napoli
+9/18/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+9/16/2026, Eating Out, -13.00, , Personal, Bistro Luna
+9/15/2026, Groceries, -57.91, , Personal, Spar
+9/15/2026, Other Income, 128.64, Sold stuff online, Personal, 
+9/14/2026, Eating Out, -2.80, , Personal, Café Central
+9/12/2026, Services, -11.99, Streaming, Personal, Netflix
+9/12/2026, Groceries, -43.44, , Personal, Mercator
+9/12/2026, Going Out, -17.70, Drinks with friends, Personal, 
+9/9/2026, Eating Out, -13.00, , Personal, Pizzeria Napoli
+9/9/2026, Shopping, -35.34, Kitchen stuff, Personal, Amazon
+9/8/2026, Groceries, -22.28, , Personal, Hofer
+9/8/2026, Eating Out, -13.00, , Personal, Bistro Luna
+9/5/2026, Services, -24.99, Internet + phone, Personal, Telekom
+9/5/2026, Groceries, -64.87, , Personal, Mercator
+9/1/2026, Housing, -650.00, Rent, Personal, Landlord
+9/1/2026, Salary, 2450.00, Monthly salary, Bank, ACME d.o.o.
+9/1/2026, Groceries, -35.67, , Personal, Hofer
+8/31/2026, Transport, -45.04, Fuel, Personal, Petrol
+8/29/2026, Groceries, -36.95, , Personal, Lidl
+8/28/2026, Eating Out, -13.00, , Personal, Café Central
+8/27/2026, Eating Out, -8.90, , Personal, Café Central
+8/26/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+8/25/2026, Groceries, -21.58, , Personal, Hofer
+8/25/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+8/24/2026, Eating Out, -13.00, , Personal, Pizzeria Napoli
+8/24/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+8/22/2026, Groceries, -34.35, , Personal, Hofer
+8/22/2026, Going Out, -14.61, Concert, Personal, 
+8/21/2026, Eating Out, -1.60, , Personal, Pizzeria Napoli
+8/20/2026, Housing, -53.88, Electricity, Personal, Energy Co
+8/20/2026, Transport, -41.33, Fuel, Personal, Petrol
+8/19/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+8/18/2026, Groceries, -52.47, , Personal, Mercator
+8/18/2026, Eating Out, -3.50, , Personal, Pizzeria Napoli
+8/17/2026, Eating Out, -13.00, , Personal, Pizzeria Napoli
+8/15/2026, Groceries, -73.27, , Personal, Mercator
+8/12/2026, Services, -11.99, Streaming, Personal, Netflix
+8/12/2026, Eating Out, -2.80, , Personal, Café Central
+8/11/2026, Groceries, -42.13, , Personal, Mercator
+8/11/2026, Eating Out, -2.80, , Personal, Bistro Luna
+8/8/2026, Groceries, -37.00, , Personal, Spar
+8/8/2026, Going Out, -35.39, Cinema, Personal, 
+8/7/2026, Eating Out, -1.60, , Personal, Kebab House
+8/7/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+8/7/2026, Holidays, -61.20, Groceries & snacks, Personal, Konzum
+8/6/2026, Eating Out, -2.80, , Personal, Kebab House
+8/6/2026, Holidays, -24.00, Boat trip, Personal, 
+8/5/2026, Services, -24.99, Internet + phone, Personal, Telekom
+8/5/2026, Eating Out, -11.50, , Personal, Bistro Luna
+8/5/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+8/5/2026, Holidays, -38.40, Dinner by the sea, Personal, Konoba Mare
+8/4/2026, Groceries, -64.16, , Personal, Spar
+8/4/2026, Eating Out, -3.50, , Personal, Bistro Luna
+8/4/2026, Holidays, -342.50, "Hotel, 4 nights", Personal, Booking.com
+8/3/2026, Eating Out, -8.90, , Personal, Kebab House
+8/3/2026, Holidays, -189.00, Flights, Personal, Ryanair
+8/2/2026, Transport, -49.22, Fuel, Personal, Petrol
+8/1/2026, Housing, -650.00, Rent, Personal, Landlord
+8/1/2026, Salary, 2450.00, Monthly salary, Bank, ACME d.o.o.
+8/1/2026, Groceries, -43.21, , Personal, Mercator
+7/29/2026, Eating Out, -2.20, , Personal, Bistro Luna
+7/28/2026, Groceries, -48.24, , Personal, Spar
+7/27/2026, Eating Out, -13.00, , Personal, Pizzeria Napoli
+7/25/2026, Groceries, -19.19, , Personal, Mercator
+7/23/2026, Gifts, -56.45, Birthday present, Personal, 
+7/22/2026, Eating Out, -1.60, , Personal, Kebab House
+7/21/2026, Groceries, -35.58, , Personal, Spar
+7/21/2026, Eating Out, -8.90, , Personal, Café Central
+7/21/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+7/20/2026, Housing, -61.57, Electricity, Personal, Energy Co
+7/20/2026, Eating Out, -8.90, , Personal, Café Central
+7/18/2026, Groceries, -35.76, , Personal, Mercator
+7/18/2026, Going Out, -32.39, Drinks with friends, Personal, 
+7/17/2026, Eating Out, -11.50, , Personal, Café Central
+7/17/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+7/16/2026, Eating Out, -2.80, , Personal, Pizzeria Napoli
+7/14/2026, Groceries, -30.78, , Personal, Lidl
+7/14/2026, Eating Out, -8.90, , Personal, Pizzeria Napoli
+7/14/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+7/12/2026, Services, -11.99, Streaming, Personal, Netflix
+7/11/2026, Groceries, -25.42, , Personal, Lidl
+7/10/2026, Eating Out, -3.50, , Personal, Café Central
+7/10/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+7/9/2026, Eating Out, -3.50, , Personal, Kebab House
+7/7/2026, Groceries, -53.59, , Personal, Mercator
+7/7/2026, Eating Out, -8.90, , Personal, Pizzeria Napoli
+7/5/2026, Services, -24.99, Internet + phone, Personal, Telekom
+7/5/2026, Transport, -64.96, Fuel, Personal, Petrol
+7/4/2026, Groceries, -46.72, , Personal, Lidl
+7/3/2026, Eating Out, -3.50, , Personal, Café Central
+7/2/2026, Eating Out, -13.00, , Personal, Café Central
+7/2/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+7/2/2026, Gifts, -26.94, Birthday present, Personal, 
+7/1/2026, Housing, -650.00, Rent, Personal, Landlord
+7/1/2026, Salary, 2450.00, Monthly salary, Bank, ACME d.o.o.
+7/1/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+6/30/2026, Groceries, -25.18, , Personal, Spar
+6/30/2026, Eating Out, -13.00, , Personal, Bistro Luna
+6/29/2026, Health, -24.88, Pharmacy, Personal, Lekarna
+6/27/2026, Groceries, -31.46, , Personal, Mercator
+6/25/2026, Eating Out, -11.50, , Personal, Kebab House
+6/24/2026, Eating Out, -1.60, , Personal, Pizzeria Napoli
+6/23/2026, Groceries, -36.70, , Personal, Spar
+6/20/2026, Housing, -83.66, Electricity, Personal, Energy Co
+6/20/2026, Groceries, -67.03, , Personal, Hofer
+6/20/2026, Going Out, -29.71, Concert, Personal, 
+6/17/2026, Eating Out, -2.80, , Personal, Pizzeria Napoli
+6/16/2026, Groceries, -25.80, , Personal, Lidl
+6/15/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+6/13/2026, Groceries, -19.25, , Personal, Hofer
+6/13/2026, Going Out, -32.01, Concert, Personal, 
+6/12/2026, Services, -11.99, Streaming, Personal, Netflix
+6/12/2026, Eating Out, -3.50, , Personal, Kebab House
+6/12/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+6/10/2026, Eating Out, -2.80, , Personal, Café Central
+6/9/2026, Groceries, -63.17, , Personal, Spar
+6/9/2026, Eating Out, -8.90, , Personal, Kebab House
+6/8/2026, Eating Out, -2.80, , Personal, Café Central
+6/8/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+6/6/2026, Groceries, -48.84, , Personal, Lidl
+6/6/2026, Going Out, -44.29, Drinks with friends, Personal, 
+6/5/2026, Services, -24.99, Internet + phone, Personal, Telekom
+6/4/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+6/3/2026, Eating Out, -8.90, , Personal, Kebab House
+6/3/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+6/2/2026, Groceries, -39.73, , Personal, Spar
+6/2/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+6/1/2026, Housing, -650.00, Rent, Personal, Landlord
+6/1/2026, Salary, 2450.00, Monthly salary, Bank, ACME d.o.o.
+6/1/2026, Eating Out, -3.50, , Personal, Bistro Luna
+5/30/2026, Groceries, -74.94, , Personal, Hofer
+5/27/2026, Eating Out, -13.00, , Personal, Kebab House
+5/26/2026, Groceries, -74.56, , Personal, Lidl
+5/26/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+5/25/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+5/23/2026, Groceries, -38.62, , Personal, Hofer
+5/21/2026, Eating Out, -3.50, , Personal, Café Central
+5/20/2026, Housing, -64.67, Electricity, Personal, Energy Co
+5/20/2026, Eating Out, -2.80, , Personal, Kebab House
+5/19/2026, Groceries, -20.29, , Personal, Spar
+5/16/2026, Groceries, -40.94, , Personal, Mercator
+5/15/2026, Eating Out, -1.60, , Personal, Bistro Luna
+5/15/2026, Other Income, 88.65, Sold stuff online, Personal, 
+5/14/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+5/13/2026, Eating Out, -2.80, , Personal, Kebab House
+5/13/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+5/12/2026, Services, -11.99, Streaming, Personal, Netflix
+5/12/2026, Groceries, -55.64, , Personal, Spar
+5/12/2026, Eating Out, -8.90, , Personal, Café Central
+5/12/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+5/9/2026, Groceries, -24.75, , Personal, Hofer
+5/8/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+5/7/2026, Eating Out, -1.60, , Personal, Pizzeria Napoli
+5/5/2026, Services, -24.99, Internet + phone, Personal, Telekom
+5/5/2026, Groceries, -38.57, , Personal, Mercator
+5/5/2026, Eating Out, -8.90, , Personal, Bistro Luna
+5/5/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+5/2/2026, Groceries, -33.44, , Personal, Mercator
+5/1/2026, Housing, -650.00, Rent, Personal, Landlord
+5/1/2026, Salary, 2450.00, Monthly salary, Bank, ACME d.o.o.
+4/30/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+4/29/2026, Eating Out, -11.50, , Personal, Kebab House
+4/28/2026, Groceries, -36.53, , Personal, Hofer
+4/28/2026, Eating Out, -13.00, , Personal, Pizzeria Napoli
+4/28/2026, Gifts, -57.66, Birthday present, Personal, 
+4/27/2026, Eating Out, -3.50, , Personal, Bistro Luna
+4/25/2026, Groceries, -42.82, , Personal, Mercator
+4/24/2026, Eating Out, -3.50, , Personal, Kebab House
+4/24/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+4/23/2026, Transport, -53.32, Fuel, Personal, Petrol
+4/22/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+4/21/2026, Groceries, -50.99, , Personal, Mercator
+4/20/2026, Housing, -59.76, Electricity, Personal, Energy Co
+4/18/2026, Groceries, -21.91, , Personal, Lidl
+4/18/2026, Going Out, -16.17, Drinks with friends, Personal, 
+4/15/2026, Other Income, 92.38, Sold stuff online, Personal, 
+4/14/2026, Groceries, -37.16, , Personal, Hofer
+4/12/2026, Services, -11.99, Streaming, Personal, Netflix
+4/11/2026, Groceries, -41.95, , Personal, Lidl
+4/11/2026, Gifts, -30.83, Birthday present, Personal, 
+4/10/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+4/9/2026, Eating Out, -2.80, , Personal, Pizzeria Napoli
+4/8/2026, Eating Out, -11.50, , Personal, Pizzeria Napoli
+4/7/2026, Groceries, -64.46, , Personal, Hofer
+4/5/2026, Services, -24.99, Internet + phone, Personal, Telekom
+4/4/2026, Groceries, -68.88, , Personal, Lidl
+4/2/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+4/2/2026, Shopping, -44.48, Kitchen stuff, Personal, Zara
+4/1/2026, Housing, -650.00, Rent, Personal, Landlord
+4/1/2026, Salary, 2450.00, Monthly salary, Bank, ACME d.o.o.
+4/1/2026, Eating Out, -1.60, , Personal, Pizzeria Napoli
+3/31/2026, Groceries, -42.50, , Personal, Mercator
+3/30/2026, Gifts, -27.91, Birthday present, Personal, 
+3/28/2026, Groceries, -53.52, , Personal, Lidl
+3/26/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+3/26/2026, Transport, -50.90, Fuel, Personal, Petrol
+3/25/2026, Eating Out, -8.90, , Personal, Kebab House
+3/24/2026, Groceries, -33.91, , Personal, Hofer
+3/24/2026, Shopping, -107.70, Books, Personal, IKEA
+3/23/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+3/23/2026, Transport, -44.83, Fuel, Personal, Petrol
+3/21/2026, Groceries, -67.25, , Personal, Spar
+3/20/2026, Housing, -84.05, Electricity, Personal, Energy Co
+3/20/2026, Transport, -58.41, Fuel, Personal, Petrol
+3/17/2026, Groceries, -20.05, , Personal, Mercator
+3/17/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+3/16/2026, Eating Out, -3.50, , Personal, Kebab House
+3/14/2026, Groceries, -57.19, , Personal, Mercator
+3/13/2026, Eating Out, -1.60, , Personal, Café Central
+3/12/2026, Services, -11.99, Streaming, Personal, Netflix
+3/12/2026, Transport, -60.43, Fuel, Personal, Petrol
+3/10/2026, Groceries, -60.86, , Personal, Lidl
+3/10/2026, Eating Out, -8.90, , Personal, Café Central
+3/10/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+3/9/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+3/7/2026, Groceries, -56.49, , Personal, Spar
+3/7/2026, Going Out, -14.71, Drinks with friends, Personal, 
+3/6/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+3/5/2026, Services, -24.99, Internet + phone, Personal, Telekom
+3/3/2026, Groceries, -45.68, , Personal, Spar
+3/3/2026, Shopping, -59.04, Kitchen stuff, Personal, Amazon
+3/1/2026, Housing, -650.00, Rent, Personal, Landlord
+3/1/2026, Salary, 2450.00, Monthly salary, Bank, ACME d.o.o.
+2/28/2026, Groceries, -63.63, , Personal, Lidl
+2/28/2026, Going Out, -20.24, Cinema, Personal, 
+2/27/2026, Eating Out, -3.50, , Personal, Kebab House
+2/27/2026, Transport, -56.34, Fuel, Personal, Petrol
+2/26/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+2/25/2026, Eating Out, -8.90, , Personal, Bistro Luna
+2/25/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+2/24/2026, Groceries, -51.53, , Personal, Spar
+2/24/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+2/23/2026, Eating Out, -11.50, , Personal, Pizzeria Napoli
+2/21/2026, Groceries, -25.32, , Personal, Hofer
+2/20/2026, Housing, -77.27, Electricity, Personal, Energy Co
+2/20/2026, Eating Out, -2.20, , Personal, Café Central
+2/20/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+2/19/2026, Eating Out, -2.20, , Personal, Café Central
+2/18/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+2/17/2026, Groceries, -54.53, , Personal, Lidl
+2/17/2026, Eating Out, -2.20, , Personal, Kebab House
+2/17/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+2/16/2026, Transport, -58.02, Fuel, Personal, Petrol
+2/14/2026, Groceries, -25.88, , Personal, Hofer
+2/12/2026, Services, -11.99, Streaming, Personal, Netflix
+2/12/2026, Eating Out, -3.50, , Personal, Kebab House
+2/11/2026, Eating Out, -1.60, , Personal, Pizzeria Napoli
+2/10/2026, Groceries, -44.35, , Personal, Mercator
+2/7/2026, Groceries, -30.99, , Personal, Mercator
+2/5/2026, Services, -24.99, Internet + phone, Personal, Telekom
+2/3/2026, Groceries, -41.91, , Personal, Hofer
+2/3/2026, Transport, -60.15, Fuel, Personal, Petrol
+2/2/2026, Transport, -1.30, Bus ticket, Personal, City Bus
+2/2/2026, Shopping, -41.86, Shoes, Personal, IKEA
+2/1/2026, Housing, -650.00, Rent, Personal, Landlord
+2/1/2026, Salary, 2450.00, Monthly salary, Bank, ACME d.o.o.
+2/1/2026, Shopping, -47.50, Jacket, Personal, IKEA

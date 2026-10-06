@@ -1,0 +1,5 @@
+# Unix line endings everywhere (gradlew must run on macOS/Linux), except Windows scripts.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary
