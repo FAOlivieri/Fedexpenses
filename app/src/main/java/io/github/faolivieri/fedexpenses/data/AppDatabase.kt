@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ProcessedNotification::class,
         CapturedNotification::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,7 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
 
         /**
@@ -80,6 +80,32 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_recurrenceId` ON `transactions` (`recurrenceId`)")
             }
         }
+
+        /**
+         * v4: watched apps get separate expense and income patterns (the old single pattern keeps
+         * its direction), and seller rules get an optional note.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(NOTIFICATION_RULES_V4_CREATE)
+                db.execSQL(
+                    "INSERT INTO notification_rules_v4 (id, name, packageName, expensePattern, expenseEnabled, " +
+                        "incomePattern, incomeEnabled, accountId, enabled) " +
+                        "SELECT id, name, packageName, " +
+                        "CASE WHEN type = 'INCOME' THEN '' ELSE pattern END, CASE WHEN type = 'INCOME' THEN 0 ELSE 1 END, " +
+                        "CASE WHEN type = 'INCOME' THEN pattern ELSE '' END, CASE WHEN type = 'INCOME' THEN 1 ELSE 0 END, " +
+                        "accountId, enabled FROM notification_rules"
+                )
+                db.execSQL("DROP TABLE notification_rules")
+                db.execSQL("ALTER TABLE notification_rules_v4 RENAME TO notification_rules")
+                db.execSQL("ALTER TABLE seller_rules ADD COLUMN note TEXT")
+            }
+        }
+
+        private const val NOTIFICATION_RULES_V4_CREATE = "CREATE TABLE IF NOT EXISTS `notification_rules_v4` (" +
+            "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `packageName` TEXT NOT NULL, " +
+            "`expensePattern` TEXT NOT NULL, `expenseEnabled` INTEGER NOT NULL, `incomePattern` TEXT NOT NULL, " +
+            "`incomeEnabled` INTEGER NOT NULL, `accountId` INTEGER NOT NULL, `enabled` INTEGER NOT NULL)"
 
         private const val RECURRENCES_CREATE = "CREATE TABLE IF NOT EXISTS `recurrences` (" +
             "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `frequency` TEXT NOT NULL, `startDay` INTEGER NOT NULL, " +

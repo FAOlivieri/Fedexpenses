@@ -147,7 +147,10 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onEditRule: (Long)
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(r.name, style = MaterialTheme.typography.bodyLarge)
-                        Text(vm.appLabel(r.packageName) ?: "${r.packageName} (not installed)",
+                        val directions = listOfNotNull(
+                            "expenses".takeIf { r.expenseEnabled }, "income".takeIf { r.incomeEnabled },
+                        ).joinToString(" & ").ifEmpty { "nothing enabled" }
+                        Text((vm.appLabel(r.packageName) ?: "${r.packageName} (not installed)") + " · " + directions,
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(r.enabled, { vm.setRuleEnabled(r, it) })

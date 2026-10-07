@@ -42,15 +42,14 @@ class TxNotifier(private val context: Context) {
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
 
     /**
-     * [quickPicks] non-empty means the seller is unknown: ask for a category with one button per pick.
+     * [ask] means the seller is unknown: ask for a category, with one button per quick pick.
      * Android shows at most three action buttons, so callers pass up to two picks plus "Edit manually".
      */
     @SuppressLint("MissingPermission")
-    fun showDetected(tx: Transaction, category: Category, quickPicks: List<Category>) {
+    fun showDetected(tx: Transaction, category: Category, ask: Boolean, quickPicks: List<Category>) {
         if (!canPost()) return
         val amount = (if (tx.type == TxType.EXPENSE) "−" else "+") + Money.format(tx.amountCents)
         val seller = tx.merchant ?: tx.note
-        val ask = quickPicks.isNotEmpty()
         val b = NotificationCompat.Builder(context, if (ask) CHANNEL_ASK else CHANNEL_ADDED)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(if (ask) "What category is this?" else "Transaction detected")
@@ -93,7 +92,8 @@ class TxNotifier(private val context: Context) {
         if (!canPost()) return
         val i = Intent(context, MainActivity::class.java)
             .setAction(MainActivity.ACTION_NEW_TX)
-            .putExtra(MainActivity.EXTRA_TYPE, rule.type.name)
+            // Unknown direction: assume an expense unless the app only reports income.
+            .putExtra(MainActivity.EXTRA_TYPE, (if (rule.incomeEnabled && !rule.expenseEnabled) TxType.INCOME else TxType.EXPENSE).name)
             .putExtra(MainActivity.EXTRA_TIMESTAMP, postedAt)
             .putExtra(MainActivity.EXTRA_ACCOUNT_ID, rule.accountId)
             .setData(Uri.parse("expenses://hidden/${key.hashCode()}"))

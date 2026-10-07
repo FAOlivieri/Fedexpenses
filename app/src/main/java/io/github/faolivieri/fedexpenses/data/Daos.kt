@@ -88,6 +88,10 @@ interface TransactionDao {
     @Query("UPDATE transactions SET categoryId = :categoryId WHERE id IN (:ids)")
     suspend fun setCategory(ids: List<Long>, categoryId: Long)
 
+    /** Sets [note] on those of [ids] that don't have a note yet. */
+    @Query("UPDATE transactions SET note = :note WHERE id IN (:ids) AND TRIM(note) = ''")
+    suspend fun setNoteWhereEmpty(ids: List<Long>, note: String)
+
     @Query("SELECT MIN(timestamp) FROM transactions")
     fun observeEarliest(): Flow<Long?>
 

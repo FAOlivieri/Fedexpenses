@@ -6,6 +6,7 @@ import io.github.faolivieri.fedexpenses.data.ProcessedNotification
 import io.github.faolivieri.fedexpenses.data.Repository
 import io.github.faolivieri.fedexpenses.data.Transaction
 import io.github.faolivieri.fedexpenses.data.TxSource
+import io.github.faolivieri.fedexpenses.data.TxType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -34,7 +35,7 @@ class NotificationProcessor(
     private val scope: CoroutineScope,
 ) {
     private val rules: StateFlow<List<NotificationRule>?> =
-        repo.rules.observeAll().map { list -> list.filter { it.enabled } }
+        repo.rules.observeAll().map { list -> list.filter { it.enabled && it.activePatterns.isNotEmpty() } }
             .stateIn(scope, SharingStarted.Eagerly, null)
 
     /** Serializes processing so the "already processed" check can't race. */
@@ -83,27 +84,31 @@ class NotificationProcessor(
             return@withLock
         }
 
-        var matched: Pair<NotificationRule, ParseResult.Match>? = null
-        for (rule in watching) {
-            val r = RuleEngine.parse(rule.pattern, n.title, n.text)
-            if (r is ParseResult.Match) { matched = rule to r; break }
+        // First matching pattern wins: each app's income patterns, then its expense patterns.
+        var matched: Triple<NotificationRule, TxType, ParseResult.Match>? = null
+        search@ for (rule in watching) {
+            for ((type, pattern) in rule.activePatterns) {
+                val r = RuleEngine.parse(pattern, n.title, n.text)
+                if (r is ParseResult.Match) { matched = Triple(rule, type, r); break@search }
+            }
         }
 
         var txId: Long? = null
         if (matched != null) {
-            val (rule, m) = matched
-            val known = repo.categoryForMerchant(m.merchant)
+            val (rule, type, m) = matched
+            val sellerRule = repo.sellerRuleFor(m.merchant)
+            val known = sellerRule?.categoryId?.let { repo.getCategory(it) }
             val categoryId = known?.id ?: repo.uncategorizedId()
             val tx = Transaction(
-                timestamp = n.postedAt, amountCents = m.amountCents, type = rule.type,
+                timestamp = n.postedAt, amountCents = m.amountCents, type = type,
                 categoryId = categoryId, accountId = rule.accountId,
-                merchant = m.merchant, source = TxSource.NOTIFICATION,
+                note = sellerRule?.note.orEmpty(), merchant = m.merchant, source = TxSource.NOTIFICATION,
             )
             txId = repo.saveTransaction(tx)
             val saved = tx.copy(id = txId)
             val category = known ?: repo.getCategory(categoryId)!!
-            val picks = if (known == null) repo.mostUsedCategories(rule.type, QUICK_PICKS) else emptyList()
-            notifier.showDetected(saved, category, picks)
+            val picks = if (known == null) repo.mostUsedCategories(type, QUICK_PICKS) else emptyList()
+            notifier.showDetected(saved, category, ask = known == null, quickPicks = picks)
         }
 
         log.capture(CapturedNotification(packageName = n.packageName, title = n.title, text = n.text,

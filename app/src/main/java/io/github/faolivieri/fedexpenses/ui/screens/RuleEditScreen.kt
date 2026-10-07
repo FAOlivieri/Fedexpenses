@@ -42,6 +42,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.Switch
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,7 +57,6 @@ import io.github.faolivieri.fedexpenses.notify.RuleEngine
 import io.github.faolivieri.fedexpenses.ui.AppEntry
 import io.github.faolivieri.fedexpenses.ui.MainViewModel
 import io.github.faolivieri.fedexpenses.ui.SettingsViewModel
-import io.github.faolivieri.fedexpenses.ui.components.TypeToggle
 import io.github.faolivieri.fedexpenses.ui.theme.LocalMoneyColors
 import io.github.faolivieri.fedexpenses.util.Money
 import java.text.DateFormat
@@ -69,8 +71,10 @@ fun RuleEditScreen(vm: SettingsViewModel, main: MainViewModel, ruleId: Long, onD
     var loaded by rememberSaveable { mutableStateOf(ruleId == 0L) }
     var name by rememberSaveable { mutableStateOf("") }
     var pkg by rememberSaveable { mutableStateOf("") }
-    var pattern by rememberSaveable { mutableStateOf(Defaults.GOOGLE_WALLET_PATTERN) }
-    var type by rememberSaveable { mutableStateOf(TxType.EXPENSE) }
+    var expensePattern by rememberSaveable { mutableStateOf(Defaults.GOOGLE_WALLET_PATTERN) }
+    var expenseEnabled by rememberSaveable { mutableStateOf(true) }
+    var incomePattern by rememberSaveable { mutableStateOf("") }
+    var incomeEnabled by rememberSaveable { mutableStateOf(false) }
     var accountId by rememberSaveable { mutableLongStateOf(0L) }
     var enabled by rememberSaveable { mutableStateOf(true) }
     var sampleTitle by rememberSaveable { mutableStateOf("SPAR") }
@@ -80,16 +84,22 @@ fun RuleEditScreen(vm: SettingsViewModel, main: MainViewModel, ruleId: Long, onD
     LaunchedEffect(ruleId) {
         if (ruleId != 0L && !loaded) {
             vm.getRule(ruleId)?.let {
-                name = it.name; pkg = it.packageName; pattern = it.pattern
-                type = it.type; accountId = it.accountId; enabled = it.enabled
+                name = it.name; pkg = it.packageName; accountId = it.accountId; enabled = it.enabled
+                expensePattern = it.expensePattern; expenseEnabled = it.expenseEnabled
+                incomePattern = it.incomePattern; incomeEnabled = it.incomeEnabled
             }
             loaded = true
         }
     }
     LaunchedEffect(accounts) { if (accountId == 0L && accounts.isNotEmpty()) accountId = accounts.first().id }
 
-    val patternError = (RuleEngine.parse(pattern, "", "") as? ParseResult.InvalidPattern)?.message
-    val canSave = name.isNotBlank() && pkg.isNotBlank() && pattern.isNotBlank() && patternError == null && accountId != 0L
+    fun errorOf(pattern: String) = (RuleEngine.parse(pattern, "", "") as? ParseResult.InvalidPattern)?.message
+    val expenseError = errorOf(expensePattern)
+    val incomeError = errorOf(incomePattern)
+    val rule = NotificationRule(ruleId, name.trim(), pkg.trim(), expensePattern, expenseEnabled, incomePattern,
+        incomeEnabled, accountId, enabled)
+    val canSave = name.isNotBlank() && pkg.isNotBlank() && accountId != 0L && rule.activePatterns.isNotEmpty() &&
+        !(expenseEnabled && expenseError != null) && !(incomeEnabled && incomeError != null)
 
     Scaffold(
         topBar = {
@@ -106,10 +116,7 @@ fun RuleEditScreen(vm: SettingsViewModel, main: MainViewModel, ruleId: Long, onD
         bottomBar = {
             Button(
                 enabled = canSave && loaded,
-                onClick = {
-                    vm.saveRule(NotificationRule(ruleId, name.trim(), pkg.trim(), pattern, type, accountId, enabled))
-                    onDone()
-                },
+                onClick = { vm.saveRule(rule); onDone() },
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
             ) { Text("Save") }
         },
@@ -126,37 +133,44 @@ fun RuleEditScreen(vm: SettingsViewModel, main: MainViewModel, ruleId: Long, onD
                 trailingIcon = { IconButton(onClick = { pickApp = true }) { Icon(Icons.Filled.Apps, "Pick app") } },
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text("Creates", style = MaterialTheme.typography.labelLarge)
-            TypeToggle(type, { type = it }, modifier = Modifier.fillMaxWidth())
             Text("Account", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 accounts.forEach { a -> FilterChip(a.id == accountId, { accountId = a.id }, label = { Text(a.name) }) }
             }
 
-            OutlinedTextField(
-                pattern, { pattern = it }, label = { Text("Patterns (regular expressions)") },
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                isError = patternError != null,
-                supportingText = {
-                    Text(patternError ?: "One pattern per line; the first that matches wins. Each is matched " +
-                        "against the notification's title, a line break, then its text. Capture the amount as " +
-                        "(?<amount>…) and optionally the seller as (?<merchant>…); without it the title is used.")
-                },
-                modifier = Modifier.fillMaxWidth(),
+            Text(
+                "Each pattern box holds one regular expression per line; the first that matches wins. Income " +
+                    "patterns are tried before expense ones, so a catch-all expense pattern can't swallow incoming " +
+                    "money. A pattern is matched against the notification's title, " +
+                    "a line break, then its text. Capture the amount as (?<amount>…) and optionally the seller as " +
+                    "(?<merchant>…); without it the title is used.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = { pattern = Defaults.GOOGLE_WALLET_PATTERN }) { Text("Reset to Google Wallet pattern") }
+
+            PatternSection(
+                title = "Expenses", subtitle = "Notifications of money going out",
+                checked = expenseEnabled, onChecked = { expenseEnabled = it },
+                pattern = expensePattern, onPattern = { expensePattern = it }, error = expenseError,
+            ) {
+                TextButton(onClick = { expensePattern = Defaults.GOOGLE_WALLET_PATTERN }) { Text("Reset to Google Wallet pattern") }
+            }
+            PatternSection(
+                title = "Income", subtitle = "Notifications of money coming in",
+                checked = incomeEnabled, onChecked = { incomeEnabled = it },
+                pattern = incomePattern, onPattern = { incomePattern = it }, error = incomeError,
+            )
 
             SectionHeader("Try it")
             OutlinedTextField(sampleTitle, { sampleTitle = it }, label = { Text("Notification title") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(sampleText, { sampleText = it }, label = { Text("Notification text") }, modifier = Modifier.fillMaxWidth())
-            ResultLine(RuleEngine.parse(pattern, sampleTitle, sampleText), type)
+            ResultLine(evaluate(rule, sampleTitle, sampleText))
 
             val recent = captured.filter { pkg.isBlank() || it.packageName == pkg }
             SectionHeader("Recent notifications from this app")
             if (recent.isEmpty()) {
                 Text(
                     "Notifications from watched apps appear here once notification access is granted. " +
-                        "Save the rule, make a payment, then come back to fine-tune the pattern.",
+                        "Save the rule, make a payment, then come back to fine-tune the patterns.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -171,7 +185,7 @@ fun RuleEditScreen(vm: SettingsViewModel, main: MainViewModel, ruleId: Long, onD
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(n.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                     Text(n.text, style = MaterialTheme.typography.bodySmall)
-                    ResultLine(RuleEngine.parse(pattern, n.title, n.text), type)
+                    ResultLine(evaluate(rule, n.title, n.text))
                 }
             }
             Spacer(Modifier.heightIn(min = 24.dp))
@@ -187,17 +201,61 @@ fun RuleEditScreen(vm: SettingsViewModel, main: MainViewModel, ruleId: Long, onD
     }
 }
 
+/** One direction (expenses or income): an on/off switch and its patterns. */
+@Composable
+private fun PatternSection(
+    title: String, subtitle: String,
+    checked: Boolean, onChecked: (Boolean) -> Unit,
+    pattern: String, onPattern: (String) -> Unit, error: String?,
+    extra: @Composable () -> Unit = {},
+) {
+    Column(
+        Modifier.fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked, onChecked)
+        }
+        if (checked) {
+            OutlinedTextField(
+                pattern, onPattern, label = { Text("Patterns") },
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                isError = error != null,
+                supportingText = error?.let { { Text(it) } },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            extra()
+        }
+    }
+}
+
+/** What the rule would do with a notification, mirroring the order the app tries patterns in. */
+private fun evaluate(rule: NotificationRule, title: String, text: String): Pair<TxType?, ParseResult> {
+    val results = rule.activePatterns.map { (type, pattern) -> type to RuleEngine.parse(pattern, title, text) }
+    return results.firstOrNull { it.second is ParseResult.Match }
+        ?: results.firstOrNull { it.second !is ParseResult.NoMatch }
+        ?: (null to ParseResult.NoMatch)
+}
+
 @Composable
 private fun SectionHeader(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
 }
 
 @Composable
-private fun ResultLine(r: ParseResult, type: TxType) {
+private fun ResultLine(result: Pair<TxType?, ParseResult>) {
+    val (type, r) = result
     val money = LocalMoneyColors.current
     val (text, color) = when (r) {
-        is ParseResult.Match -> "✓ ${if (type == TxType.EXPENSE) "−" else "+"}${Money.format(r.amountCents)} · seller \"${r.merchant}\"" to
-            (if (type == TxType.EXPENSE) money.expense else money.income)
+        is ParseResult.Match ->
+            "✓ ${if (type == TxType.INCOME) "Income +" else "Expense −"}${Money.format(r.amountCents)} · seller \"${r.merchant}\"" to
+                (if (type == TxType.INCOME) money.income else money.expense)
         ParseResult.NoMatch -> "✗ No match — no transaction would be created" to MaterialTheme.colorScheme.onSurfaceVariant
         ParseResult.NoAmount -> "✗ Matched, but no amount found in the (?<amount>…) group" to MaterialTheme.colorScheme.error
         is ParseResult.InvalidPattern -> "✗ ${r.message}" to MaterialTheme.colorScheme.error

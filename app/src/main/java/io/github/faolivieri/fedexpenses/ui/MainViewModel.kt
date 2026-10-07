@@ -199,7 +199,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun saveSellerRule(r: SellerRule): Long = repo.saveSellerRule(r)
     fun deleteSellerRule(id: Long) = viewModelScope.launch { repo.deleteSellerRule(id) }
     fun reorderSellerRules(ids: List<Long>) = viewModelScope.launch { repo.reorderSellerRules(ids) }
-    suspend fun setCategory(txIds: List<Long>, categoryId: Long) = repo.setCategory(txIds, categoryId)
+    suspend fun setCategory(txIds: List<Long>, categoryId: Long, note: String? = null) =
+        repo.setCategory(txIds, categoryId, note)
 
     suspend fun saveAccount(a: Account): Long = repo.saveAccount(a)
     fun deleteAccount(a: Account, moveTo: Long) = viewModelScope.launch { repo.deleteAccount(a, moveTo) }

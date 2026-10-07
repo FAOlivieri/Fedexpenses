@@ -15,7 +15,7 @@ data class BackupData(
 
 object Backup {
     const val FORMAT = "expenses-backup"
-    const val VERSION = 3
+    const val VERSION = 4
 
     fun toJson(d: BackupData): String = JSONObject().apply {
         put("format", FORMAT)
@@ -37,7 +37,7 @@ object Backup {
         put("sellerRules", JSONArray(d.sellerRules.map {
             JSONObject().put("id", it.id).put("matchType", it.matchType.name).put("pattern", it.pattern)
                 .put("useLastMatched", it.useLastMatched).put("categoryId", it.categoryId ?: JSONObject.NULL)
-                .put("position", it.position).put("updatedAt", it.updatedAt)
+                .put("position", it.position).put("updatedAt", it.updatedAt).put("note", it.note ?: JSONObject.NULL)
         }))
         put("recurrences", JSONArray(d.recurrences.map {
             JSONObject().put("id", it.id).put("frequency", it.frequency.name).put("startDay", it.startDay)
@@ -47,7 +47,9 @@ object Backup {
         }))
         put("rules", JSONArray(d.rules.map {
             JSONObject().put("id", it.id).put("name", it.name).put("packageName", it.packageName)
-                .put("pattern", it.pattern).put("type", it.type.name).put("accountId", it.accountId)
+                .put("expensePattern", it.expensePattern).put("expenseEnabled", it.expenseEnabled)
+                .put("incomePattern", it.incomePattern).put("incomeEnabled", it.incomeEnabled)
+                .put("accountId", it.accountId)
                 .put("enabled", it.enabled)
         }))
     }.toString()
@@ -84,12 +86,22 @@ object Backup {
                     pattern = it.getString("pattern"), useLastMatched = it.getBoolean("useLastMatched"),
                     categoryId = if (it.isNull("categoryId")) null else it.getLong("categoryId"),
                     position = it.getInt("position"), updatedAt = it.getLong("updatedAt"),
+                    note = if (it.isNull("note")) null else it.getString("note"),
                 )
             } ?: legacyMerchants(o),
             rules = o.optJSONArray("rules")?.objects()?.map {
-                NotificationRule(it.getLong("id"), it.getString("name"), it.getString("packageName"),
-                    it.getString("pattern"), TxType.valueOf(it.getString("type")), it.getLong("accountId"),
-                    it.optBoolean("enabled", true))
+                val legacyIncome = !it.has("expensePattern") && it.optString("type") == TxType.INCOME.name
+                NotificationRule(
+                    id = it.getLong("id"), name = it.getString("name"), packageName = it.getString("packageName"),
+                    // Before v4 a rule had one pattern and one direction.
+                    expensePattern = if (it.has("expensePattern")) it.getString("expensePattern")
+                        else if (legacyIncome) "" else it.getString("pattern"),
+                    expenseEnabled = if (it.has("expensePattern")) it.getBoolean("expenseEnabled") else !legacyIncome,
+                    incomePattern = if (it.has("incomePattern")) it.getString("incomePattern")
+                        else if (legacyIncome) it.getString("pattern") else "",
+                    incomeEnabled = if (it.has("incomePattern")) it.getBoolean("incomeEnabled") else legacyIncome,
+                    accountId = it.getLong("accountId"), enabled = it.optBoolean("enabled", true),
+                )
             } ?: emptyList(),
             recurrences = o.optJSONArray("recurrences")?.objects()?.map {
                 Recurrence(

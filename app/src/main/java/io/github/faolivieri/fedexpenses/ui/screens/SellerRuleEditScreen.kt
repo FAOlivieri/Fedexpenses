@@ -16,6 +16,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -72,6 +75,7 @@ fun SellerRuleEditScreen(vm: MainViewModel, ruleId: Long, initialSeller: String,
     var useLastMatched by rememberSaveable { mutableStateOf(true) }
     var categoryId by rememberSaveable { mutableLongStateOf(0L) } // 0 = none yet
     var testSeller by rememberSaveable { mutableStateOf(initialSeller) }
+    var note by rememberSaveable { mutableStateOf("") }
     var confirmDelete by remember { mutableStateOf(false) }
     var applyDialog by remember { mutableStateOf(false) }
 
@@ -82,6 +86,7 @@ fun SellerRuleEditScreen(vm: MainViewModel, ruleId: Long, initialSeller: String,
             if (r != null && !loaded) {
                 matchType = r.matchType; pattern = r.pattern; useLastMatched = r.useLastMatched
                 categoryId = r.categoryId ?: 0L
+                note = r.note.orEmpty()
                 if (testSeller.isBlank()) testSeller = r.pattern.takeIf { r.matchType != MatchType.REGEX }.orEmpty()
                 loaded = true
             }
@@ -91,7 +96,7 @@ fun SellerRuleEditScreen(vm: MainViewModel, ruleId: Long, initialSeller: String,
     val draft = SellerRule(
         id = ruleId, matchType = matchType, pattern = pattern.trim(), useLastMatched = useLastMatched,
         categoryId = categoryId.takeIf { it != 0L }, position = original?.position ?: Int.MAX_VALUE,
-        updatedAt = original?.updatedAt ?: 0,
+        updatedAt = original?.updatedAt ?: 0, note = note.trim().ifEmpty { null },
     )
     val regexError = if (matchType == MatchType.REGEX) SellerMatcher.regexError(pattern.trim()) else null
     val canSave = loaded && pattern.isNotBlank() && regexError == null && (useLastMatched || categoryId != 0L)
@@ -195,6 +200,15 @@ fun SellerRuleEditScreen(vm: MainViewModel, ruleId: Long, initialSeller: String,
                 categoryId, onSelect = { categoryId = it.id },
             )
 
+            OutlinedTextField(
+                value = note, onValueChange = { note = it }, label = { Text("Note (optional)") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null) },
+                supportingText = { Text("Detected payments this rule matches get this note.") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             SectionHeader("Test")
             OutlinedTextField(testSeller, { testSeller = it }, label = { Text("Seller name") }, singleLine = true,
                 modifier = Modifier.fillMaxWidth())
@@ -242,18 +256,19 @@ fun SellerRuleEditScreen(vm: MainViewModel, ruleId: Long, initialSeller: String,
                     "${plural(differing.size, "payment")} decided by this rule currently " +
                         (if (differing.size == 1) "has" else "have") + " another category" +
                         (if (uncategorized.isNotEmpty()) " (${uncategorized.size} Uncategorized)" else "") +
-                        ". The rule is saved as well."
+                        ". " + (if (draft.note != null) "Payments without a note also get \"${draft.note}\". " else "") +
+                        "The rule is saved as well."
                 )
             },
             confirmButton = {
                 Column(horizontalAlignment = Alignment.End) {
                     TextButton(onClick = {
                         applyDialog = false
-                        save { vm.setCategory(differing.map { it.id }, categoryId) }
+                        save { vm.setCategory(differing.map { it.id }, categoryId, draft.note) }
                     }, enabled = differing.isNotEmpty()) { Text("Change all ${differing.size}") }
                     TextButton(onClick = {
                         applyDialog = false
-                        save { vm.setCategory(uncategorized.map { it.id }, categoryId) }
+                        save { vm.setCategory(uncategorized.map { it.id }, categoryId, draft.note) }
                     }, enabled = uncategorized.isNotEmpty()) { Text("Only the ${uncategorized.size} uncategorized") }
                     TextButton(onClick = { applyDialog = false }) { Text("Cancel") }
                 }

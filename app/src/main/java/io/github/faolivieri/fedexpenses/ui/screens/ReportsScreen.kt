@@ -2,6 +2,7 @@ package io.github.faolivieri.fedexpenses.ui.screens
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -136,7 +137,12 @@ fun ReportsScreen(vm: MainViewModel) {
                 if (showTable) ValuesTable(d.labels, visible)
             }
 
-            SectionTitle("Series")
+            Row(Modifier.fillMaxWidth().padding(end = 8.dp), verticalAlignment = Alignment.Bottom) {
+                Box(Modifier.weight(1f)) { SectionTitle("Series") }
+                TextButton(onClick = { vm.report.value = cfg.copy(series = emptyList()) }, enabled = cfg.series.isNotEmpty()) {
+                    Text("Clear")
+                }
+            }
             FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(SeriesKey.AllExpenses in cfg.series, { toggle(SeriesKey.AllExpenses) },
                     label = { Text("All expenses") })

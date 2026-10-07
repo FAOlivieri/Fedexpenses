@@ -77,23 +77,38 @@ data class SellerRule(
     val categoryId: Long?,
     val position: Int,
     val updatedAt: Long,
+    /** Note given to detected payments this rule matches, if any. */
+    val note: String? = null,
 )
 
 /**
- * How to recognise and parse a payment notification from one app.
- * [pattern] is matched against "title\ntext" and should define the named groups
- * `amount` and optionally `merchant` (falls back to the notification title).
+ * How to recognise payment notifications from one app. Each pattern field holds one regex per
+ * line, matched against "title\ntext"; it captures `amount` and optionally `merchant` (falls back
+ * to the notification title). Income patterns are tried first: they're usually specific ("Received…"),
+ * while expense patterns are often catch-alls that would also match incoming money.
  */
 @Entity(tableName = "notification_rules")
 data class NotificationRule(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val packageName: String,
-    val pattern: String,
-    val type: TxType = TxType.EXPENSE,
+    /** Recognises outgoing payments. */
+    val expensePattern: String,
+    val expenseEnabled: Boolean = true,
+    /** Recognises incoming money. */
+    val incomePattern: String = "",
+    val incomeEnabled: Boolean = false,
     val accountId: Long,
+    /** Switches the whole app on or off. */
     val enabled: Boolean = true,
-)
+) {
+    /** The patterns in use, in the order they're tried. */
+    val activePatterns: List<Pair<TxType, String>>
+        get() = buildList {
+            if (incomeEnabled && incomePattern.isNotBlank()) add(TxType.INCOME to incomePattern)
+            if (expenseEnabled && expensePattern.isNotBlank()) add(TxType.EXPENSE to expensePattern)
+        }
+}
 
 /** Notifications already turned into transactions, so a rescan never double-counts. */
 @Entity(tableName = "processed_notifications")

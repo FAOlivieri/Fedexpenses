@@ -117,7 +117,9 @@ private fun SellerRuleRow(rule: SellerRule, category: Category?, onClick: () -> 
                 fontFamily = if (rule.matchType == MatchType.REGEX) FontFamily.Monospace else null,
             )
             Text(
-                rule.matchType.label + if (rule.useLastMatched) " · last matched" else "",
+                rule.matchType.label + (if (rule.useLastMatched) " · last matched" else "") +
+                    (rule.note?.let { " · note \"$it\"" } ?: ""),
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

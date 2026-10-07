@@ -259,23 +259,6 @@ fun EditTransactionScreen(
                 next = nextRepeat(recurrence, frequency, endDay, LocalDate.parse(date), original, isNew = txId == 0L),
             )
 
-            Text("Category", style = MaterialTheme.typography.titleSmall,
-                color = if (triedSave && categoryId == 0L) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
-            val shown = categories
-                .filter { (it.type == type && !it.isSystem) || (it.isSystem && it.id == categoryId) }
-                .sortedByDescending { usage[it.id] ?: 0 }
-            CategoryGrid(shown, categoryId, onSelect = { categoryId = it.id }, onNew = { newCategory = true })
-
-            Text("Account", style = MaterialTheme.typography.titleSmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                accounts.forEach { a ->
-                    FilterChip(a.id == accountId, { accountId = a.id }, label = { Text(a.name) },
-                        leadingIcon = { IconBadge(a.icon, a.color, 20.dp) })
-                }
-                FilterChip(false, { newAccount = true }, label = { Text("New account") },
-                    leadingIcon = { Icon(Icons.Filled.Add, null, Modifier.size(18.dp)) })
-            }
-
             OutlinedTextField(
                 value = seller, onValueChange = { seller = it }, label = { Text("Seller") },
                 leadingIcon = { Icon(Icons.Filled.Storefront, null) },
@@ -293,6 +276,23 @@ fun EditTransactionScreen(
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            Text("Category", style = MaterialTheme.typography.titleSmall,
+                color = if (triedSave && categoryId == 0L) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+            val shown = categories
+                .filter { (it.type == type && !it.isSystem) || (it.isSystem && it.id == categoryId) }
+                .sortedByDescending { usage[it.id] ?: 0 }
+            CategoryGrid(shown, categoryId, onSelect = { categoryId = it.id }, onNew = { newCategory = true })
+
+            Text("Account", style = MaterialTheme.typography.titleSmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                accounts.forEach { a ->
+                    FilterChip(a.id == accountId, { accountId = a.id }, label = { Text(a.name) },
+                        leadingIcon = { IconBadge(a.icon, a.color, 20.dp) })
+                }
+                FilterChip(false, { newAccount = true }, label = { Text("New account") },
+                    leadingIcon = { Icon(Icons.Filled.Add, null, Modifier.size(18.dp)) })
+            }
 
             if (original?.source == TxSource.RECURRING) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

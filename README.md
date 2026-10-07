@@ -82,6 +82,7 @@ When Google Wallet reports a payment, the transaction is saved straight away, wi
 
 - **Match**: *Exact* seller name, *Contains* a word or phrase (e.g. `lidl` matches "LIDL Ljubljana 123"), or a *Regex*. None of them care about upper/lower case.
 - **Category**: *Always this category*, or *Last matched*, meaning the category you last gave a payment from that seller.
+- **Note** (optional): every detected payment the rule matches gets this note, for example "Lunch" for your canteen.
 - **Order**: rules are tried from the top and the first match wins. Drag the ≡ handle to reorder.
 - The editor shows which past payments a rule applies to, and can recategorize them in one go.
 
@@ -95,15 +96,21 @@ When adding or editing a transaction, set **Repeat** to weekly, monthly or yearl
 
 ### Watching other apps (e.g. your bank)
 
-**Settings → Watched apps → Add app to watch.** Pick the app, then describe its notifications with one or more [regular expressions](https://regexone.com/), one per line. The first one that matches is used. Each expression is matched against the notification's **title, a line break, then its text**, and must capture:
+**Settings → Watched apps → Add app to watch.** Pick the app, then describe its notifications with [regular expressions](https://regexone.com/). Each app has two sections, which you switch on and off separately:
+
+- **Expenses**: patterns for money going out, recorded as expenses.
+- **Income**: patterns for money coming in, recorded as income.
+
+Each section holds one or more patterns, one per line, and the first one that matches is used. Income patterns are tried before expense patterns, so a catch-all expense pattern (like the Google Wallet one) can't swallow incoming payments. Each pattern is matched against the notification's **title, a line break, then its text**, and must capture:
 
 - `(?<amount>…)`: the amount, e.g. `12,50 €`, `€12.50`, or `1.234,56`.
 - `(?<merchant>…)`: optional, the seller. Without it, the notification title is used.
 
-Example for a bank notification saying *"Card payment of 23,40 EUR at SPAR LJUBLJANA"*:
+Example for a bank whose notifications say *"Card payment of 23,40 EUR at SPAR LJUBLJANA"* and *"Received 1.500,00 EUR from ACME d.o.o."*:
 
 ```
-payment of (?<amount>[\d.,]+) EUR at (?<merchant>.+)
+Expenses:  payment of (?<amount>[\d.,]+) EUR at (?<merchant>.+)
+Income:    Received (?<amount>[\d.,]+) EUR from (?<merchant>.+)
 ```
 
 The editor lists recent notifications from that app and shows live whether your pattern matches each one, and what it would record.

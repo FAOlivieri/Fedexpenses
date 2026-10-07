@@ -47,7 +47,7 @@ class Repository(private val db: AppDatabase) {
                     ?: accounts.insert(Account(name = "Personal", color = Defaults.palette[0]))
                 if (rules.getAll().isEmpty()) {
                     rules.insert(NotificationRule(name = "Google Wallet", packageName = Defaults.GOOGLE_WALLET_PACKAGE,
-                        pattern = Defaults.GOOGLE_WALLET_PATTERN, accountId = accountId))
+                        expensePattern = Defaults.GOOGLE_WALLET_PATTERN, accountId = accountId))
                 }
             }
             seeded = true
@@ -121,9 +121,8 @@ class Repository(private val db: AppDatabase) {
         }
     }
 
-    /** Category the seller rules give [merchant], or null when the user should be asked. */
-    suspend fun categoryForMerchant(merchant: String): Category? =
-        SellerMatcher.firstMatch(sellerRules.getAll(), merchant)?.categoryId?.let { categories.get(it) }
+    /** The seller rule that decides [merchant]'s category and note: the topmost match, if any. */
+    suspend fun sellerRuleFor(merchant: String): SellerRule? = SellerMatcher.firstMatch(sellerRules.getAll(), merchant)
 
     // --- Seller rules -------------------------------------------------------------------------
 
@@ -144,8 +143,13 @@ class Repository(private val db: AppDatabase) {
         sellerRules.updateAll(orderedIds.mapIndexedNotNull { i, id -> byId[id]?.copy(position = i) })
     }
 
-    suspend fun setCategory(txIds: List<Long>, categoryId: Long) {
-        if (txIds.isNotEmpty()) txs.setCategory(txIds, categoryId)
+    /** Applies a seller rule to past payments: its category, and its note where they have none. */
+    suspend fun setCategory(txIds: List<Long>, categoryId: Long, note: String? = null) {
+        if (txIds.isEmpty()) return
+        db.withTransaction {
+            txs.setCategory(txIds, categoryId)
+            if (!note.isNullOrBlank()) txs.setNoteWhereEmpty(txIds, note)
+        }
     }
 
     suspend fun mostUsedCategories(type: TxType, limit: Int): List<Category> {
@@ -153,7 +157,9 @@ class Repository(private val db: AppDatabase) {
         val recent = categories.mostUsed(type, since, limit)
         if (recent.size >= limit) return recent
         val all = categories.mostUsed(type, 0, limit)
-        return (recent + all).distinctBy { it.id }.take(limit)
+        // Little or no history yet (e.g. a fresh install): fill up with other categories of this type.
+        val others = categories.getAll().filter { it.type == type && !it.isSystem }.sortedBy { it.name.lowercase() }
+        return (recent + all + others).distinctBy { it.id }.take(limit)
     }
 
     // --- Repeating transactions ----------------------------------------------------------------
