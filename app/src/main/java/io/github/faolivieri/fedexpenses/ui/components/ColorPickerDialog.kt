@@ -49,7 +49,7 @@ import io.github.faolivieri.fedexpenses.data.Defaults
 /** Free color choice: hue bar, saturation and brightness sliders, quick swatches and hex entry. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ColorPickerDialog(initial: Int, onDismiss: () -> Unit, onPick: (Int) -> Unit) {
+fun ColorPickerDialog(initial: Int, onDismiss: () -> Unit, onPick: (Int) -> Unit, title: String = "Custom color") {
     val hsv = remember { FloatArray(3).also { android.graphics.Color.colorToHSV(initial, it) } }
     var hue by remember { mutableFloatStateOf(hsv[0]) }
     var saturation by remember { mutableFloatStateOf(hsv[1]) }
@@ -67,7 +67,7 @@ fun ColorPickerDialog(initial: Int, onDismiss: () -> Unit, onPick: (Int) -> Unit
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Custom color") },
+        title = { Text(title) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.fillMaxWidth().height(56.dp).background(color, RoundedCornerShape(12.dp)))

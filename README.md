@@ -23,9 +23,9 @@ Everything stays on your phone: the app has **no internet permission**. Backups 
 - **Overview** of income, expenses and balance per month or year, with a breakdown by category.
 - **Transactions** list with search and filters; expenses in red, income in green.
 - **Reports**: plot any categories, or all expenses and all income, over any range of months or years.
-- **Categories** with your own names, colors and icons; several **accounts**.
+- **Categories** with your own names, icons and colors (16 presets or any color); several **accounts**.
 - **Backups** to Google Drive or any folder, plus CSV import and export.
-- Light and dark theme, with a choice of color palettes, your wallpaper colors (Android 12+) or any custom color (Settings → Color palette); works with large font and display sizes.
+- Light and dark theme, with a choice of color palettes, your wallpaper colors (Android 12+) or any custom color, and a background that matches the palette, stays neutral, or uses its own color (Settings → Color palette / Background); works with large font and display sizes.
 
 ## Installing
 

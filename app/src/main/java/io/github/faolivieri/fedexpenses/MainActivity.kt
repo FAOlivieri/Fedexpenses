@@ -32,9 +32,9 @@ class MainActivity : ComponentActivity() {
         val settings = container.settings
         setContent {
             // Re-themes live when the palette is changed in Settings.
-            val theme by remember {
-                settings.changes().map { ThemeChoice(settings.themePalette, settings.themeCustomColor) }
-            }.collectAsState(initial = ThemeChoice(settings.themePalette, settings.themeCustomColor))
+            fun choice() = ThemeChoice(settings.themePalette, settings.themeCustomColor,
+                settings.themeBackground, settings.themeBackgroundColor)
+            val theme by remember { settings.changes().map { choice() } }.collectAsState(initial = choice())
             ExpensesTheme(theme) {
                 ExpensesNavHost(pendingRoute = pendingRoute, onRouteConsumed = { pendingRoute.value = null })
             }

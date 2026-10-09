@@ -33,6 +33,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import io.github.faolivieri.fedexpenses.ui.components.ColorPickerDialog
 import io.github.faolivieri.fedexpenses.ui.theme.Palettes
+import io.github.faolivieri.fedexpenses.ui.theme.Backgrounds
+import io.github.faolivieri.fedexpenses.ui.theme.ThemeChoice
+import io.github.faolivieri.fedexpenses.ui.theme.schemeFor
 import io.github.faolivieri.fedexpenses.ui.theme.schemeFromSeed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -97,6 +100,7 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onEditRule: (Long)
     var resumeTick by remember { mutableIntStateOf(0) }
     var confirmRestore by remember { mutableStateOf<Uri?>(null) }
     var pickingColor by remember { mutableStateOf(false) }
+    var pickingBackground by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { resumeTick++ }
 
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { resumeTick++ }
@@ -264,6 +268,19 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onEditRule: (Long)
                         onPick = { vm.setCustomColor(it); pickingColor = false },
                     )
                 }
+
+                SectionTitle("Background")
+                BackgroundChooser(
+                    selected = s.background, choice = ThemeChoice(s.palette, s.customColor, s.background, s.backgroundColor),
+                    onSelect = vm::setBackground, onCustom = { pickingBackground = true },
+                )
+                if (pickingBackground) {
+                    ColorPickerDialog(
+                        initial = s.backgroundColor, title = "Background color",
+                        onDismiss = { pickingBackground = false },
+                        onPick = { vm.setBackgroundColor(it); pickingBackground = false },
+                    )
+                }
             }
             Spacer(Modifier.height(32.dp))
         }
@@ -322,6 +339,39 @@ private fun PaletteChooser(selected: String, customColor: Int, onSelect: (String
     )
 }
 
+/** Background options, each previewed with its page and card colors for the current palette. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BackgroundChooser(selected: String, choice: ThemeChoice, onSelect: (String) -> Unit, onCustom: () -> Unit) {
+    val context = LocalContext.current
+    val dark = isSystemInDarkTheme()
+    val wallpaper = remember(dark) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        } else null
+    }
+    FlowRow(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        listOf(
+            Triple(Backgrounds.PALETTE, "Match palette", null),
+            Triple(Backgrounds.NEUTRAL, "Neutral", null),
+            Triple(Backgrounds.CUSTOM, "Custom", Icons.Filled.Colorize),
+        ).forEach { (id, name, icon) ->
+            val preview = remember(choice, id, dark) { schemeFor(choice.copy(background = id), dark, wallpaper) }
+            PaletteSwatch(name, preview.surfaceContainerHigh, preview.background, selected == id, icon = icon,
+                onClick = if (id == Backgrounds.CUSTOM) onCustom else ({ onSelect(id) }))
+        }
+    }
+    Text(
+        "Applies to the page, cards, bars and dialogs. Custom: any color; the app keeps it light in light mode " +
+            "and dark in dark mode so text stays readable.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+}
+
 /** A circle split into the palette's main color and its light container color. */
 @Composable
 private fun PaletteSwatch(
@@ -341,9 +391,9 @@ private fun PaletteSwatch(
             contentAlignment = Alignment.Center,
         ) {
             when {
-                selected -> Icon(Icons.Filled.Check, null, tint = if (main.luminance() > 0.5f) Color.Black else Color.White,
+                selected -> Icon(Icons.Filled.Check, null, tint = if (main.luminance() > 0.4f) Color.Black else Color.White,
                     modifier = Modifier.size(20.dp))
-                icon != null -> Icon(icon, null, tint = if (main.luminance() > 0.5f) Color.Black else Color.White,
+                icon != null -> Icon(icon, null, tint = if (main.luminance() > 0.4f) Color.Black else Color.White,
                     modifier = Modifier.size(20.dp))
             }
         }

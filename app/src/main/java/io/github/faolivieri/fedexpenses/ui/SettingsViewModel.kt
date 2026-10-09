@@ -11,6 +11,7 @@ import io.github.faolivieri.fedexpenses.data.CapturedNotification
 import io.github.faolivieri.fedexpenses.data.NotificationRule
 import io.github.faolivieri.fedexpenses.util.Money
 import io.github.faolivieri.fedexpenses.ui.theme.Palettes
+import io.github.faolivieri.fedexpenses.ui.theme.Backgrounds
 import io.github.faolivieri.fedexpenses.work.BackupWorker
 import io.github.faolivieri.fedexpenses.work.Jobs
 import io.github.faolivieri.fedexpenses.work.openForOverwrite
@@ -33,6 +34,8 @@ data class SettingsState(
     val autoBackup: Boolean,
     val palette: String,
     val customColor: Int,
+    val background: String,
+    val backgroundColor: Int,
 )
 
 data class AppEntry(val label: String, val packageName: String)
@@ -58,6 +61,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             autoBackup = settings.autoBackup,
             palette = settings.themePalette,
             customColor = settings.themeCustomColor,
+            background = settings.themeBackground,
+            backgroundColor = settings.themeBackgroundColor,
         )
     }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
@@ -146,6 +151,13 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setCustomColor(argb: Int) {
         settings.themeCustomColor = argb
         settings.themePalette = Palettes.CUSTOM
+    }
+
+    fun setBackground(id: String) { settings.themeBackground = id }
+
+    fun setBackgroundColor(argb: Int) {
+        settings.themeBackgroundColor = argb
+        settings.themeBackground = Backgrounds.CUSTOM
     }
 
     fun setCurrency(symbol: String) {

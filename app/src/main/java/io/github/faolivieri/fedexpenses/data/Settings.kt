@@ -40,6 +40,16 @@ class Settings(context: Context) {
         get() = prefs.getInt("theme_custom_color", 0xFF2A78D6.toInt())
         set(v) = prefs.edit().putInt("theme_custom_color", v).apply()
 
+    /** "palette", "neutral" or "custom" (see ui.theme.Backgrounds). */
+    var themeBackground: String
+        get() = prefs.getString("theme_background", "palette") ?: "palette"
+        set(v) = prefs.edit().putString("theme_background", v).apply()
+
+    /** Color for the "custom" background. */
+    var themeBackgroundColor: Int
+        get() = prefs.getInt("theme_background_color", 0xFF8D6E63.toInt())
+        set(v) = prefs.edit().putInt("theme_background_color", v).apply()
+
     /** Emits whenever any setting changes, so screens can refresh. */
     fun changes(): Flow<Unit> = callbackFlow {
         val l = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> trySend(Unit) }

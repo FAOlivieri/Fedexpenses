@@ -24,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Colorize
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -138,19 +140,43 @@ fun PeriodSelector(period: Period, onChange: (Period) -> Unit, modifier: Modifie
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ColorPicker(selected: Int, onSelect: (Int) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    val custom = selected !in Defaults.palette
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Defaults.palette.forEach { c ->
-            val isSel = c == selected
-            Box(
-                Modifier.size(36.dp)
-                    .background(Color(c), CircleShape)
-                    .then(if (isSel) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
-                    .clickable { onSelect(c) },
-                contentAlignment = Alignment.Center,
-            ) {
-                if (isSel) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
-            }
+        Defaults.palette.forEach { c -> ColorDot(Color(c), c == selected) { onSelect(c) } }
+        // Last dot: any color. Shows the current color when it isn't one of the presets.
+        Box(
+            Modifier.size(36.dp)
+                .background(if (custom) Color(selected) else MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape)
+                .then(if (custom) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+                .clickable { picking = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(if (custom) Icons.Filled.Check else Icons.Filled.Colorize, "Custom color",
+                tint = when {
+                    !custom -> MaterialTheme.colorScheme.onSurfaceVariant
+                    Color(selected).luminance() > 0.6f -> Color.Black
+                    else -> Color.White
+                },
+                modifier = Modifier.size(18.dp))
         }
+    }
+    if (picking) {
+        ColorPickerDialog(initial = selected, onDismiss = { picking = false }, onPick = { onSelect(it); picking = false })
+    }
+}
+
+@Composable
+private fun ColorDot(color: Color, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(36.dp)
+            .background(color, CircleShape)
+            .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) Icon(Icons.Filled.Check, null, tint = if (color.luminance() > 0.6f) Color.Black else Color.White,
+            modifier = Modifier.size(18.dp))
     }
 }
 

@@ -30,9 +30,26 @@ val LocalMoneyColors = staticCompositionLocalOf { LightMoney }
 /** A preset app palette, defined by one seed color. */
 data class Palette(val id: String, val name: String, val seed: Color)
 
-/** The user's palette choice: a preset id, [Palettes.WALLPAPER], or [Palettes.CUSTOM] with [customColor]. */
+/**
+ * The user's colors: the accent palette (a preset id, [Palettes.WALLPAPER], or [Palettes.CUSTOM] with
+ * [customColor]) and the background ([Backgrounds], with [backgroundColor] for a custom one).
+ */
 @Immutable
-data class ThemeChoice(val paletteId: String = Palettes.DEFAULT, val customColor: Int = Palettes.presets[0].seed.toArgb())
+data class ThemeChoice(
+    val paletteId: String = Palettes.DEFAULT,
+    val customColor: Int = Palettes.presets[0].seed.toArgb(),
+    val background: String = Backgrounds.PALETTE,
+    val backgroundColor: Int = 0xFF8D6E63.toInt(),
+)
+
+object Backgrounds {
+    /** Tinted with the palette's hue (or the wallpaper's surfaces). */
+    const val PALETTE = "palette"
+    /** Plain greys. */
+    const val NEUTRAL = "neutral"
+    /** Tinted with [ThemeChoice.backgroundColor]. */
+    const val CUSTOM = "custom"
+}
 
 object Palettes {
     const val DEFAULT = "ocean"
@@ -169,17 +186,74 @@ fun schemeFromSeed(seed: Color, dark: Boolean): ColorScheme {
     }
 }
 
+/**
+ * Background, card, bar and dialog colors with the hue and saturation of [h]/[s] and a fixed
+ * luminance per role, so text keeps its contrast whatever color is chosen.
+ */
+fun ColorScheme.withTintedSurfaces(h: Float, s: Float, dark: Boolean): ColorScheme {
+    fun c(target: Float) = withLuminance(h, s, target)
+    return if (!dark) copy(
+        background = c(0.92f), surface = c(0.92f),
+        surfaceContainerLowest = c(0.97f), surfaceContainerLow = c(0.885f), surfaceContainer = c(0.85f),
+        surfaceContainerHigh = c(0.815f), surfaceContainerHighest = c(0.78f), surfaceVariant = c(0.815f),
+        surfaceBright = c(0.95f), surfaceDim = c(0.80f), outlineVariant = c(0.62f),
+    ) else copy(
+        background = c(0.012f), surface = c(0.012f),
+        surfaceContainerLowest = c(0.008f), surfaceContainerLow = c(0.017f), surfaceContainer = c(0.023f),
+        surfaceContainerHigh = c(0.031f), surfaceContainerHighest = c(0.04f), surfaceVariant = c(0.031f),
+        surfaceBright = c(0.05f), surfaceDim = c(0.010f), outlineVariant = c(0.07f),
+    )
+}
+
+/** Plain grey surfaces (the original look). */
+private fun ColorScheme.withNeutralSurfaces(dark: Boolean): ColorScheme {
+    val n = if (dark) OceanDark else OceanLight
+    return copy(
+        background = n.background, surface = n.surface,
+        surfaceContainerLowest = n.surfaceContainerLowest, surfaceContainerLow = n.surfaceContainerLow,
+        surfaceContainer = n.surfaceContainer, surfaceContainerHigh = n.surfaceContainerHigh,
+        surfaceContainerHighest = if (dark) Color(0xFF353532) else Color(0xFFE4E3DF),
+        surfaceVariant = n.surfaceContainerHigh, outlineVariant = n.outlineVariant,
+        surfaceBright = n.surfaceContainerLowest, surfaceDim = n.surfaceContainerHigh,
+    )
+}
+
+private fun hueSat(color: Color): Pair<Float, Float> {
+    val out = FloatArray(3)
+    ColorUtils.colorToHSL(color.toArgb(), out)
+    return out[0] to out[1]
+}
+
+/** The complete scheme for a choice: accent colors first, then the chosen background. */
+fun schemeFor(choice: ThemeChoice, dark: Boolean, wallpaper: ColorScheme?): ColorScheme {
+    val accent = when {
+        choice.paletteId == Palettes.WALLPAPER && wallpaper != null -> wallpaper
+        choice.paletteId == Palettes.DEFAULT -> if (dark) OceanDark else OceanLight
+        else -> schemeFromSeed(Palettes.seedOf(choice), dark)
+    }
+    return when (choice.background) {
+        Backgrounds.NEUTRAL -> accent.withNeutralSurfaces(dark)
+        Backgrounds.CUSTOM -> {
+            val (h, s) = hueSat(Color(choice.backgroundColor))
+            accent.withTintedSurfaces(h, s.coerceAtMost(0.9f), dark)
+        }
+        // Wallpaper colors come with their own matching surfaces.
+        else -> if (accent === wallpaper) accent else {
+            val (h, s) = hueSat(Palettes.seedOf(choice))
+            accent.withTintedSurfaces(h, s.coerceAtMost(0.85f) * 0.55f, dark)
+        }
+    }
+}
+
 @Composable
 fun ExpensesTheme(choice: ThemeChoice = ThemeChoice(), content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
     val context = LocalContext.current
     val scheme = remember(choice, dark) {
-        when {
-            choice.paletteId == Palettes.WALLPAPER && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-                if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            choice.paletteId == Palettes.DEFAULT -> if (dark) OceanDark else OceanLight
-            else -> schemeFromSeed(Palettes.seedOf(choice), dark)
-        }
+        val wallpaper = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        } else null
+        schemeFor(choice, dark, wallpaper)
     }
     CompositionLocalProvider(LocalMoneyColors provides if (dark) DarkMoney else LightMoney) {
         MaterialTheme(colorScheme = scheme, content = content)
