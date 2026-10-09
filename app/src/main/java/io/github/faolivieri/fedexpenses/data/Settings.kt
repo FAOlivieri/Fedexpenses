@@ -30,6 +30,16 @@ class Settings(context: Context) {
         get() = prefs.getBoolean("auto_backup", true)
         set(v) = prefs.edit().putBoolean("auto_backup", v).apply()
 
+    /** App color palette: a preset id, "wallpaper" or "custom" (see ui.theme.Palettes). */
+    var themePalette: String
+        get() = prefs.getString("theme_palette", "ocean") ?: "ocean"
+        set(v) = prefs.edit().putString("theme_palette", v).apply()
+
+    /** Seed color for the "custom" palette. */
+    var themeCustomColor: Int
+        get() = prefs.getInt("theme_custom_color", 0xFF2A78D6.toInt())
+        set(v) = prefs.edit().putInt("theme_custom_color", v).apply()
+
     /** Emits whenever any setting changes, so screens can refresh. */
     fun changes(): Flow<Unit> = callbackFlow {
         val l = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> trySend(Unit) }

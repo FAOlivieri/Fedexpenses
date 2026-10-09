@@ -13,6 +13,27 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Colorize
+import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import io.github.faolivieri.fedexpenses.ui.components.ColorPickerDialog
+import io.github.faolivieri.fedexpenses.ui.theme.Palettes
+import io.github.faolivieri.fedexpenses.ui.theme.schemeFromSeed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -75,6 +96,7 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onEditRule: (Long)
     val busy by vm.busy.collectAsStateWithLifecycle()
     var resumeTick by remember { mutableIntStateOf(0) }
     var confirmRestore by remember { mutableStateOf<Uri?>(null) }
+    var pickingColor by remember { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { resumeTick++ }
 
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { resumeTick++ }
@@ -229,6 +251,19 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onEditRule: (Long)
                     label = { Text("Currency symbol") }, singleLine = true,
                     modifier = Modifier.padding(horizontal = 16.dp).width(160.dp),
                 )
+
+                SectionTitle("Color palette")
+                PaletteChooser(
+                    selected = s.palette, customColor = s.customColor,
+                    onSelect = vm::setPalette, onCustom = { pickingColor = true },
+                )
+                if (pickingColor) {
+                    ColorPickerDialog(
+                        initial = s.customColor,
+                        onDismiss = { pickingColor = false },
+                        onPick = { vm.setCustomColor(it); pickingColor = false },
+                    )
+                }
             }
             Spacer(Modifier.height(32.dp))
         }
@@ -254,6 +289,67 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onEditRule: (Long)
             },
             dismissButton = { TextButton(onClick = { confirmRestore = null }) { Text("Cancel") } },
         )
+    }
+}
+
+/** Preset palettes, the wallpaper colors (Android 12+), and a custom color. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PaletteChooser(selected: String, customColor: Int, onSelect: (String) -> Unit, onCustom: () -> Unit) {
+    val context = LocalContext.current
+    val dark = isSystemInDarkTheme()
+    FlowRow(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Palettes.presets.forEach { p ->
+            val scheme = remember(p, dark) { schemeFromSeed(p.seed, dark) }
+            PaletteSwatch(p.name, scheme.primary, scheme.primaryContainer, selected == p.id) { onSelect(p.id) }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val wall = remember(dark) { if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) }
+            PaletteSwatch("Wallpaper", wall.primary, wall.primaryContainer, selected == Palettes.WALLPAPER,
+                icon = Icons.Filled.Wallpaper) { onSelect(Palettes.WALLPAPER) }
+        }
+        val custom = remember(customColor, dark) { schemeFromSeed(Color(customColor), dark) }
+        PaletteSwatch("Custom", custom.primary, custom.primaryContainer, selected == Palettes.CUSTOM,
+            icon = Icons.Filled.Colorize, onClick = onCustom)
+    }
+    Text(
+        "Custom: tap to pick any color. The app adjusts its lightness so text stays readable.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+}
+
+/** A circle split into the palette's main color and its light container color. */
+@Composable
+private fun PaletteSwatch(
+    name: String, main: Color, container: Color, selected: Boolean,
+    icon: ImageVector? = null, onClick: () -> Unit,
+) {
+    Column(
+        Modifier.width(76.dp).clickable(onClick = onClick).padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier.size(52.dp)
+                .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+                .padding(5.dp)
+                .clip(CircleShape)
+                .background(Brush.verticalGradient(0.5f to main, 0.5f to container)),
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                selected -> Icon(Icons.Filled.Check, null, tint = if (main.luminance() > 0.5f) Color.Black else Color.White,
+                    modifier = Modifier.size(20.dp))
+                icon != null -> Icon(icon, null, tint = if (main.luminance() > 0.5f) Color.Black else Color.White,
+                    modifier = Modifier.size(20.dp))
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(name, style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
     }
 }
 

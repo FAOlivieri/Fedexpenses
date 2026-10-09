@@ -64,7 +64,13 @@ import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun RuleEditScreen(vm: SettingsViewModel, main: MainViewModel, ruleId: Long, onDone: () -> Unit) {
+fun RuleEditScreen(
+    vm: SettingsViewModel,
+    main: MainViewModel,
+    ruleId: Long,
+    onDone: () -> Unit,
+    onOpenTransaction: (Long) -> Unit = {},
+) {
     val accounts by main.accounts.collectAsStateWithLifecycle()
     val captured by vm.captured.collectAsStateWithLifecycle()
 
@@ -188,9 +194,13 @@ fun RuleEditScreen(vm: SettingsViewModel, main: MainViewModel, ruleId: Long, onD
                     Text(n.text, style = MaterialTheme.typography.bodySmall)
                     val result = evaluate(rule, n.title, n.text)
                     ResultLine(result)
-                    if (n.transactionId != null) {
-                        Text("Recorded as a transaction", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val recordedId = n.transactionId
+                    if (recordedId != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Recorded as a transaction", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { onOpenTransaction(recordedId) }) { Text("Open") }
+                        }
                     } else if (result.second is ParseResult.Match && accountId != 0L) {
                         TextButton(onClick = { vm.processCaptured(n.id, rule) }) { Text("Process now") }
                     }

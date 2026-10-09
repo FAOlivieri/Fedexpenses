@@ -10,6 +10,11 @@ import io.github.faolivieri.fedexpenses.data.TxType
 import io.github.faolivieri.fedexpenses.ui.ExpensesNavHost
 import io.github.faolivieri.fedexpenses.ui.Routes
 import io.github.faolivieri.fedexpenses.ui.theme.ExpensesTheme
+import io.github.faolivieri.fedexpenses.ui.theme.ThemeChoice
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.flow.map
 import io.github.faolivieri.fedexpenses.work.Jobs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -24,8 +29,13 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) handleIntent(intent)
         Jobs.schedule(this)
         PaymentListenerService.ensureBound(this)
+        val settings = container.settings
         setContent {
-            ExpensesTheme {
+            // Re-themes live when the palette is changed in Settings.
+            val theme by remember {
+                settings.changes().map { ThemeChoice(settings.themePalette, settings.themeCustomColor) }
+            }.collectAsState(initial = ThemeChoice(settings.themePalette, settings.themeCustomColor))
+            ExpensesTheme(theme) {
                 ExpensesNavHost(pendingRoute = pendingRoute, onRouteConsumed = { pendingRoute.value = null })
             }
         }

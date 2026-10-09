@@ -167,7 +167,8 @@ fun ExpensesNavHost(pendingRoute: StateFlow<String?>, onRouteConsumed: () -> Uni
                 SettingsScreen(settingsVm, onBack = { nav.popBackStack() }, onEditRule = { nav.navigate(Routes.rule(it)) })
             }
             composable("rule?id={id}", arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = 0L })) { entry ->
-                RuleEditScreen(settingsVm, vm, ruleId = entry.arguments?.getLong("id") ?: 0L, onDone = { nav.popBackStack() })
+                RuleEditScreen(settingsVm, vm, ruleId = entry.arguments?.getLong("id") ?: 0L, onDone = { nav.popBackStack() },
+                    onOpenTransaction = { nav.navigate(Routes.edit(it)) })
             }
         }
     }

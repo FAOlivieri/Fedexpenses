@@ -25,7 +25,7 @@ Everything stays on your phone: the app has **no internet permission**. Backups 
 - **Reports**: plot any categories, or all expenses and all income, over any range of months or years.
 - **Categories** with your own names, colors and icons; several **accounts**.
 - **Backups** to Google Drive or any folder, plus CSV import and export.
-- Light and dark theme; works with large font and display sizes.
+- Light and dark theme, with a choice of color palettes, your wallpaper colors (Android 12+) or any custom color (Settings → Color palette); works with large font and display sizes.
 
 ## Installing
 

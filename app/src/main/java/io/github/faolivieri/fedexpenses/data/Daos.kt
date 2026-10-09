@@ -235,7 +235,12 @@ interface NotificationLogDao {
     @Insert
     suspend fun capture(c: CapturedNotification): Long
 
-    @Query("SELECT * FROM captured_notifications WHERE id = :id")
+    /**
+     * [CapturedNotification.transactionId] is only returned while that transaction still exists and
+     * is the one created from the notification (same timestamp): links go stale when a transaction
+     * is deleted or a backup restore replaces all transactions.
+     */
+    @Query("SELECT c.id, c.packageName, c.title, c.text, c.postedAt, c.matchedRuleId, (SELECT t.id FROM transactions t WHERE t.id = c.transactionId AND t.timestamp = c.postedAt) AS transactionId FROM captured_notifications c WHERE c.id = :id")
     suspend fun getCaptured(id: Long): CapturedNotification?
 
     @Update
@@ -244,8 +249,13 @@ interface NotificationLogDao {
     @Query("DELETE FROM captured_notifications WHERE id NOT IN (SELECT id FROM captured_notifications ORDER BY postedAt DESC LIMIT :keep)")
     suspend fun trimCaptured(keep: Int)
 
-    @Query("SELECT * FROM captured_notifications ORDER BY postedAt DESC")
+    /** Newest first; see [getCaptured] for how [CapturedNotification.transactionId] is checked. */
+    @Query("SELECT c.id, c.packageName, c.title, c.text, c.postedAt, c.matchedRuleId, (SELECT t.id FROM transactions t WHERE t.id = c.transactionId AND t.timestamp = c.postedAt) AS transactionId FROM captured_notifications c ORDER BY c.postedAt DESC")
     fun observeCaptured(): Flow<List<CapturedNotification>>
+
+    /** After a restore, transaction and rule ids no longer mean what they did. */
+    @Query("UPDATE captured_notifications SET transactionId = NULL, matchedRuleId = NULL")
+    suspend fun unlinkAll()
 }
 
 @Dao

@@ -339,6 +339,7 @@ class Repository(private val db: AppDatabase) {
             b.insertSellerRules(data.sellerRules)
             b.insertRecurrences(data.recurrences)
             b.insertRules(data.rules)
+            notificationLog.unlinkAll()
         }
         uncategorizedIdCache = 0L
         seeded = false
