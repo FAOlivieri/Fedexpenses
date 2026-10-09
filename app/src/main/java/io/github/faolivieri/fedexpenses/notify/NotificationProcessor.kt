@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -34,9 +33,9 @@ class NotificationProcessor(
     private val notifier: TxNotifier,
     private val scope: CoroutineScope,
 ) {
+    /** Every watched app, including switched-off ones: their notifications are still captured. */
     private val rules: StateFlow<List<NotificationRule>?> =
-        repo.rules.observeAll().map { list -> list.filter { it.enabled && it.activePatterns.isNotEmpty() } }
-            .stateIn(scope, SharingStarted.Eagerly, null)
+        repo.rules.observeAll().stateIn(scope, SharingStarted.Eagerly, null)
 
     /** Serializes processing so the "already processed" check can't race. */
     private val lock = Mutex()
@@ -75,45 +74,56 @@ class NotificationProcessor(
         if (log.isProcessed(dedupKey)) return@withLock
         log.markProcessed(ProcessedNotification(dedupKey, System.currentTimeMillis()))
 
-        if (n.hidden) {
-            // The real text is withheld from third-party listeners; let the user add it by hand.
-            notifier.showHidden(n.key, watching.first(), n.postedAt)
-            log.capture(CapturedNotification(packageName = n.packageName, title = n.title, text = n.text,
-                postedAt = n.postedAt, matchedRuleId = null, transactionId = null))
-            log.trimCaptured(KEEP_CAPTURED)
-            return@withLock
-        }
-
-        // First matching pattern wins: each app's income patterns, then its expense patterns.
-        var matched: Triple<NotificationRule, TxType, ParseResult.Match>? = null
-        search@ for (rule in watching) {
-            for ((type, pattern) in rule.activePatterns) {
-                val r = RuleEngine.parse(pattern, n.title, n.text)
-                if (r is ParseResult.Match) { matched = Triple(rule, type, r); break@search }
-            }
-        }
-
-        var txId: Long? = null
-        if (matched != null) {
-            val (rule, type, m) = matched
-            val sellerRule = repo.sellerRuleFor(m.merchant)
-            val known = sellerRule?.categoryId?.let { repo.getCategory(it) }
-            val categoryId = known?.id ?: repo.uncategorizedId()
-            val tx = Transaction(
-                timestamp = n.postedAt, amountCents = m.amountCents, type = type,
-                categoryId = categoryId, accountId = rule.accountId,
-                note = sellerRule?.note.orEmpty(), merchant = m.merchant, source = TxSource.NOTIFICATION,
-            )
-            txId = repo.saveTransaction(tx)
-            val saved = tx.copy(id = txId)
-            val category = known ?: repo.getCategory(categoryId)!!
-            val picks = if (known == null) repo.mostUsedCategories(type, QUICK_PICKS) else emptyList()
-            notifier.showDetected(saved, category, ask = known == null, quickPicks = picks)
-        }
+        val active = watching.filter { it.enabled && it.activePatterns.isNotEmpty() }
+        val matched = if (n.hidden) null else match(active, n.title, n.text)
+        // The real text of a hidden notification is withheld from third-party listeners; let the user add it by hand.
+        if (n.hidden && active.isNotEmpty()) notifier.showHidden(n.key, active.first(), n.postedAt)
+        val txId = matched?.let { (rule, type, m) -> record(rule, type, m, n.postedAt) }
 
         log.capture(CapturedNotification(packageName = n.packageName, title = n.title, text = n.text,
             postedAt = n.postedAt, matchedRuleId = matched?.first?.id, transactionId = txId))
         log.trimCaptured(KEEP_CAPTURED)
+    }
+
+    /**
+     * Records the transaction [rule] parses from an already captured notification, whether or not
+     * the rule is saved or switched on. Does nothing if the notification already has a transaction
+     * or the rule doesn't match it.
+     */
+    suspend fun processCaptured(capturedId: Long, rule: NotificationRule) = lock.withLock {
+        val log = repo.notificationLog
+        val c = log.getCaptured(capturedId)?.takeIf { it.transactionId == null } ?: return@withLock
+        val (_, type, m) = match(listOf(rule), c.title, c.text) ?: return@withLock
+        val txId = record(rule, type, m, c.postedAt)
+        log.updateCaptured(c.copy(matchedRuleId = rule.id.takeIf { it != 0L }, transactionId = txId))
+    }
+
+    /** First matching pattern wins: each app's income patterns, then its expense patterns. */
+    private fun match(rules: List<NotificationRule>, title: String, text: String): Triple<NotificationRule, TxType, ParseResult.Match>? {
+        for (rule in rules) {
+            for ((type, pattern) in rule.activePatterns) {
+                val r = RuleEngine.parse(pattern, title, text)
+                if (r is ParseResult.Match) return Triple(rule, type, r)
+            }
+        }
+        return null
+    }
+
+    /** Saves the transaction, categorized by seller rules, and notifies about it. */
+    private suspend fun record(rule: NotificationRule, type: TxType, m: ParseResult.Match, timestamp: Long): Long {
+        val sellerRule = repo.sellerRuleFor(m.merchant)
+        val known = sellerRule?.categoryId?.let { repo.getCategory(it) }
+        val categoryId = known?.id ?: repo.uncategorizedId()
+        val tx = Transaction(
+            timestamp = timestamp, amountCents = m.amountCents, type = type,
+            categoryId = categoryId, accountId = rule.accountId,
+            note = sellerRule?.note.orEmpty(), merchant = m.merchant, source = TxSource.NOTIFICATION,
+        )
+        val txId = repo.saveTransaction(tx)
+        val category = known ?: repo.getCategory(categoryId)!!
+        val picks = if (known == null) repo.mostUsedCategories(type, QUICK_PICKS) else emptyList()
+        notifier.showDetected(tx.copy(id = txId), category, ask = known == null, quickPicks = picks)
+        return txId
     }
 
     companion object {

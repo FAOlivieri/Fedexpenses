@@ -27,8 +27,8 @@ android {
         minSdk = 26
         targetSdk = 35
         // Bump both for every release; Android only installs an update with a higher versionCode.
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.1.1"
     }
 
     signingConfigs {

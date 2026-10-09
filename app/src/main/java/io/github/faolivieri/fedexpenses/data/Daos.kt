@@ -235,6 +235,12 @@ interface NotificationLogDao {
     @Insert
     suspend fun capture(c: CapturedNotification): Long
 
+    @Query("SELECT * FROM captured_notifications WHERE id = :id")
+    suspend fun getCaptured(id: Long): CapturedNotification?
+
+    @Update
+    suspend fun updateCaptured(c: CapturedNotification)
+
     @Query("DELETE FROM captured_notifications WHERE id NOT IN (SELECT id FROM captured_notifications ORDER BY postedAt DESC LIMIT :keep)")
     suspend fun trimCaptured(keep: Int)
 

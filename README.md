@@ -113,7 +113,7 @@ Expenses:  payment of (?<amount>[\d.,]+) EUR at (?<merchant>.+)
 Income:    Received (?<amount>[\d.,]+) EUR from (?<merchant>.+)
 ```
 
-The editor lists recent notifications from that app and shows live whether your pattern matches each one, and what it would record.
+The editor lists recent notifications from that app and shows live whether your pattern matches each one, and what it would record. Notifications are collected even while the app's switch is off, so you can add an app first and write its patterns once a few notifications have arrived. A notification that arrived before your pattern matched it can be recorded with **Process now**.
 
 > **Tip:** if two apps report the same payment (e.g. Google Wallet *and* your bank), watch only one of them, or you'll get it twice.
 

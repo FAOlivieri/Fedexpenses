@@ -149,6 +149,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteRule(id: Long) = viewModelScope.launch { repo.rules.delete(id) }
 
+    fun processCaptured(capturedId: Long, rule: NotificationRule) = viewModelScope.launch {
+        c.processor.processCaptured(capturedId, rule)
+    }
+
     fun setRuleEnabled(rule: NotificationRule, enabled: Boolean) = viewModelScope.launch {
         repo.rules.update(rule.copy(enabled = enabled))
     }

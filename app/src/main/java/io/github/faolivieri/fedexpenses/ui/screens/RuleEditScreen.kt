@@ -169,8 +169,9 @@ fun RuleEditScreen(vm: SettingsViewModel, main: MainViewModel, ruleId: Long, onD
             SectionHeader("Recent notifications from this app")
             if (recent.isEmpty()) {
                 Text(
-                    "Notifications from watched apps appear here once notification access is granted. " +
-                        "Save the rule, make a payment, then come back to fine-tune the patterns.",
+                    "Notifications from watched apps appear here once notification access is granted, even " +
+                        "while the app is switched off. Save the rule, make a payment, then come back to " +
+                        "fine-tune the patterns.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -185,7 +186,14 @@ fun RuleEditScreen(vm: SettingsViewModel, main: MainViewModel, ruleId: Long, onD
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(n.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                     Text(n.text, style = MaterialTheme.typography.bodySmall)
-                    ResultLine(evaluate(rule, n.title, n.text))
+                    val result = evaluate(rule, n.title, n.text)
+                    ResultLine(result)
+                    if (n.transactionId != null) {
+                        Text("Recorded as a transaction", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else if (result.second is ParseResult.Match && accountId != 0L) {
+                        TextButton(onClick = { vm.processCaptured(n.id, rule) }) { Text("Process now") }
+                    }
                 }
             }
             Spacer(Modifier.heightIn(min = 24.dp))
