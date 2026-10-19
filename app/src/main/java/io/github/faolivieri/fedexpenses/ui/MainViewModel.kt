@@ -7,8 +7,12 @@ import io.github.faolivieri.fedexpenses.container
 import io.github.faolivieri.fedexpenses.data.Account
 import io.github.faolivieri.fedexpenses.data.Category
 import io.github.faolivieri.fedexpenses.data.Frequency
+import io.github.faolivieri.fedexpenses.data.Person
 import io.github.faolivieri.fedexpenses.data.Recurrence
 import io.github.faolivieri.fedexpenses.data.SellerRule
+import io.github.faolivieri.fedexpenses.data.Settlement
+import io.github.faolivieri.fedexpenses.data.SharedEntry
+import io.github.faolivieri.fedexpenses.data.SplitPart
 import io.github.faolivieri.fedexpenses.data.Transaction
 import io.github.faolivieri.fedexpenses.data.TxDetails
 import io.github.faolivieri.fedexpenses.data.TxType
@@ -133,7 +137,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun summarize(list: List<TxDetails>): Overview {
         fun byCategory(type: TxType) = list.filter { it.tx.type == type }
             .groupBy { it.category }
-            .map { (c, l) -> CategoryTotal(c, l.sumOf { it.tx.amountCents }, l.size) }
+            .map { (c, l) -> CategoryTotal(c, l.sumOf { it.myCents }, l.size) }
             .sortedByDescending { it.cents }
         val exp = byCategory(TxType.EXPENSE)
         val inc = byCategory(TxType.INCOME)
@@ -167,7 +171,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (!inSeries) continue
                 val b = bucketOf(d.tx) ?: continue
                 // A refund in an expense category reduces that category's spending.
-                values[b] += if (d.tx.type == type) d.tx.amountCents else -d.tx.amountCents
+                values[b] += if (d.tx.type == type) d.myCents else -d.myCents
             }
             ReportSeries(key, name, color, type, values.toList())
         }
@@ -176,7 +180,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Actions -----------------------------------------------------------------------------
 
-    fun saveTransaction(tx: Transaction) = viewModelScope.launch { repo.saveTransaction(tx) }
+    fun saveTransaction(tx: Transaction, splits: List<SplitPart>? = null) =
+        viewModelScope.launch { repo.saveTransaction(tx, splits) }
+    suspend fun loadSplits(txId: Long): List<SplitPart> = repo.splitsFor(txId)
     fun deleteTransaction(id: Long) = viewModelScope.launch { repo.deleteTransaction(id) }
     suspend fun loadTransaction(id: Long): Transaction? = repo.getTransaction(id)
 
@@ -204,4 +210,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun saveAccount(a: Account): Long = repo.saveAccount(a)
     fun deleteAccount(a: Account, moveTo: Long) = viewModelScope.launch { repo.deleteAccount(a, moveTo) }
+
+    val people: StateFlow<List<Person>> =
+        repo.observePeople().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /** Each person's history with you, newest first, keyed by person id. */
+    val ledger: StateFlow<Map<Long, List<SharedEntry>>> =
+        repo.observeLedger().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    suspend fun savePerson(p: Person): Long = repo.savePerson(p)
+    suspend fun deletePerson(id: Long): Boolean = repo.deletePerson(id)
+    fun saveSettlement(s: Settlement) = viewModelScope.launch { repo.saveSettlement(s) }
+    fun deleteSettlement(id: Long) = viewModelScope.launch { repo.deleteSettlement(id) }
 }

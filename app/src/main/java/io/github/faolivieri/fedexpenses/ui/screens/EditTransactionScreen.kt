@@ -42,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -71,8 +72,11 @@ import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import io.github.faolivieri.fedexpenses.data.Category
 import io.github.faolivieri.fedexpenses.data.Frequency
+import io.github.faolivieri.fedexpenses.data.Person
 import io.github.faolivieri.fedexpenses.data.Recurrence
 import io.github.faolivieri.fedexpenses.data.Recurrences
+import io.github.faolivieri.fedexpenses.data.SplitPart
+import io.github.faolivieri.fedexpenses.data.Splits
 import io.github.faolivieri.fedexpenses.data.Transaction
 import io.github.faolivieri.fedexpenses.data.TxSource
 import io.github.faolivieri.fedexpenses.data.TxType
@@ -88,6 +92,8 @@ import io.github.faolivieri.fedexpenses.util.Money
 import io.github.faolivieri.fedexpenses.util.toLocalDate
 import io.github.faolivieri.fedexpenses.util.toMillis
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
@@ -108,6 +114,7 @@ fun EditTransactionScreen(
     val categories by vm.categories.collectAsStateWithLifecycle()
     val accounts by vm.accounts.collectAsStateWithLifecycle()
     val usage by vm.categoryUsage.collectAsStateWithLifecycle()
+    val people by vm.people.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     var original by remember { mutableStateOf<Transaction?>(null) }
@@ -132,6 +139,11 @@ fun EditTransactionScreen(
     var showEndDate by remember { mutableStateOf(false) }
     /** Edited payment of a series, waiting for "only this one" or "this and following". */
     var seriesChoice by remember { mutableStateOf<Transaction?>(null) }
+    /** Participants (person id, 0 for you) and their parts in basis points; empty when not split. */
+    var split by rememberSaveable { mutableStateOf<List<Pair<Long, Int>>>(emptyList()) }
+    /** Who paid: a person id, or 0 for you. */
+    var payer by rememberSaveable { mutableLongStateOf(0L) }
+    var newPerson by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     LaunchedEffect(txId) {
@@ -150,6 +162,8 @@ fun EditTransactionScreen(
                 seller = tx.merchant.orEmpty()
                 frequency = r?.frequency
                 endDay = r?.endDay
+                split = vm.loadSplits(txId).map { (it.personId ?: 0L) to it.basisPoints }.sortedBy { it.first != 0L }
+                payer = tx.paidBy ?: 0L
                 loaded = true
             }
         }
@@ -159,7 +173,10 @@ fun EditTransactionScreen(
     }
 
     val cents = Money.parseCents(amount)
-    val canSave = cents != null && cents > 0 && categoryId != 0L && accountId != 0L
+    val splitShown = type == TxType.EXPENSE && frequency == null
+    val splitParts = split.map { (id, bp) -> SplitPart(transactionId = 0, personId = id.takeIf { it != 0L }, basisPoints = bp) }
+    val splitValid = !splitShown || split.isEmpty() || split.sumOf { it.second } == Splits.WHOLE
+    val canSave = cents != null && cents > 0 && categoryId != 0L && accountId != 0L && splitValid
 
     fun save() {
         triedSave = true
@@ -169,15 +186,22 @@ fun EditTransactionScreen(
         // Keep the original time of day; new entries get "now" so same-day order is natural.
         val time = (base?.timestamp ?: initialTimestamp.takeIf { it > 0 })?.let { it - it.toLocalDate().toMillis() }
             ?: (LocalTime.now().toSecondOfDay() * 1000L)
+        // null keeps the existing split.
+        val splits: List<SplitPart>? = when {
+            frequency != null -> null
+            !splitShown -> emptyList()
+            else -> splitParts
+        }
         val tx = (base ?: Transaction(timestamp = 0, amountCents = 0, type = type, categoryId = 0, accountId = 0))
             .copy(timestamp = day.toMillis() + time, amountCents = cents!!, type = type,
                 categoryId = categoryId, accountId = accountId, note = note.trim(),
-                merchant = seller.trim().ifEmpty { null })
+                merchant = seller.trim().ifEmpty { null },
+                paidBy = if (splits == null) base?.paidBy else payer.takeIf { it != 0L && splits.isNotEmpty() })
         val r = recurrence
         val f = frequency
         val originalDay = base?.timestamp?.toLocalDate()
         when {
-            r == null && f == null -> vm.saveTransaction(tx)
+            r == null && f == null -> vm.saveTransaction(tx, splits)
             r == null -> {
                 vm.startRecurring(tx, f!!, endDay)
                 if (base == null && day > LocalDate.now()) {
@@ -186,7 +210,7 @@ fun EditTransactionScreen(
             }
             f == null -> {
                 vm.stopRecurring(r.id)
-                vm.saveTransaction(tx.copy(recurrenceId = null))
+                vm.saveTransaction(tx.copy(recurrenceId = null), splits)
             }
             // A new schedule applies from this payment on.
             f != r.frequency || endDay != r.endDay || day != originalDay -> vm.updateSeries(tx, originalDay!!, f, endDay)
@@ -241,6 +265,11 @@ fun EditTransactionScreen(
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
             )
             if (txId == 0L) LaunchedEffect(Unit) { focus.requestFocus() }
+            if (splitShown && split.isNotEmpty() && cents != null && cents > 0) {
+                val mine = Splits.parts(cents, splitParts, payer.takeIf { it != 0L })[null] ?: 0
+                Text("Your share: " + Money.format(mine), style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold, color = moneyColor(type))
+            }
 
             Row(
                 Modifier.fillMaxWidth().clickable { showDate = true }
@@ -283,6 +312,15 @@ fun EditTransactionScreen(
                 .filter { (it.type == type && !it.isSystem) || (it.isSystem && it.id == categoryId) }
                 .sortedByDescending { usage[it.id] ?: 0 }
             CategoryGrid(shown, categoryId, onSelect = { categoryId = it.id }, onNew = { newCategory = true })
+
+            if (splitShown) {
+                SplitSection(
+                    people = people, split = split, payer = payer, cents = cents?.takeIf { it > 0 },
+                    onSplit = { split = it; if (it.none { (id, _) -> id == payer }) payer = 0L },
+                    onPayer = { payer = it },
+                    onNewPerson = { newPerson = true },
+                )
+            }
 
             Text("Account", style = MaterialTheme.typography.titleSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -350,6 +388,16 @@ fun EditTransactionScreen(
             onDismiss = { newAccount = false },
             onSave = { a -> newAccount = false; scope.launch { accountId = vm.saveAccount(a) } },
         )
+    }
+
+    if (newPerson) {
+        PersonDialog(null, onDismiss = { newPerson = false }, onSave = { name ->
+            newPerson = false
+            scope.launch {
+                val id = vm.savePerson(Person(nickname = name))
+                split = toggled(split, id)
+            }
+        })
     }
 
     if (showEndDate) {
@@ -476,4 +524,101 @@ private fun RepeatSection(
             )
         }
     }
+}
+
+/** [split] with [personId] added or removed, parts reset to equal; you are always the first participant. */
+private fun toggled(split: List<Pair<Long, Int>>, personId: Long): List<Pair<Long, Int>> {
+    val others = split.map { it.first }.filter { it != 0L }
+    val ids = if (personId in others) others - personId else others + personId
+    if (ids.isEmpty()) return emptyList()
+    val all = listOf(0L) + ids
+    return all.zip(Splits.equal(all.size))
+}
+
+private fun formatPercent(bp: Int): String = BigDecimal.valueOf(bp.toLong(), 2).stripTrailingZeros().toPlainString()
+
+private fun parsePercent(s: String): Int? = s.replace(',', '.').toBigDecimalOrNull()
+    ?.movePointRight(2)?.setScale(0, RoundingMode.HALF_UP)?.toInt()?.takeIf { it in 0..Splits.WHOLE }
+
+/**
+ * People to split an expense with: a part (percent) for each participant, you included, and who paid.
+ * With two participants, editing one part sets the other to the rest.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SplitSection(
+    people: List<Person>, split: List<Pair<Long, Int>>, payer: Long, cents: Long?,
+    onSplit: (List<Pair<Long, Int>>) -> Unit, onPayer: (Long) -> Unit, onNewPerson: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Split with", style = MaterialTheme.typography.titleSmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            people.forEach { p ->
+                FilterChip(split.any { it.first == p.id }, { onSplit(toggled(split, p.id)) }, label = { Text(p.nickname) })
+            }
+            FilterChip(false, onNewPerson, label = { Text("New person") },
+                leadingIcon = { Icon(Icons.Filled.Add, null, Modifier.size(18.dp)) })
+        }
+        if (split.isEmpty()) return@Column
+
+        val parts = cents?.let {
+            val list = split.map { (id, bp) -> SplitPart(transactionId = 0, personId = id.takeIf { i -> i != 0L }, basisPoints = bp) }
+            Splits.parts(it, list, payer.takeIf { p -> p != 0L })
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.weight(1f))
+            Text("Paid", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center, modifier = Modifier.width(48.dp))
+        }
+        split.forEach { (id, bp) ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (id == 0L) "You" else people.firstOrNull { it.id == id }?.nickname.orEmpty(),
+                        style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (parts != null) {
+                        Text(Money.format(parts[id.takeIf { i -> i != 0L }] ?: 0), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                PercentField(bp) { v ->
+                    onSplit(split.map { (i, b) ->
+                        when {
+                            i == id -> i to v
+                            split.size == 2 -> i to Splits.WHOLE - v
+                            else -> i to b
+                        }
+                    })
+                }
+                RadioButton(payer == id, { onPayer(id) }, Modifier.width(48.dp))
+            }
+        }
+        val total = split.sumOf { it.second }
+        if (total != Splits.WHOLE) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Parts add up to ${formatPercent(total)} %, not 100 %", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                TextButton(onClick = { onSplit(split.map { it.first }.zip(Splits.equal(split.size))) }) { Text("Split equally") }
+            }
+        }
+        if (payer != 0L) {
+            Text("Someone else paid, so this doesn't change your account balance.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun PercentField(bp: Int, onChange: (Int) -> Unit) {
+    var text by remember { mutableStateOf(formatPercent(bp)) }
+    LaunchedEffect(bp) { if (parsePercent(text) != bp) text = formatPercent(bp) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { t ->
+            text = t.filter { c -> c.isDigit() || c == '.' || c == ',' }
+            parsePercent(text)?.let(onChange)
+        },
+        suffix = { Text("%") }, singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        modifier = Modifier.width(110.dp),
+    )
 }

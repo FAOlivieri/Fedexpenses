@@ -65,10 +65,15 @@ interface AccountDao {
     @Delete
     suspend fun delete(account: Account)
 
+    /** Money in and out of each account: transactions you paid, and settle-ups. */
     @Query(
-        """SELECT accountId AS id,
-           SUM(CASE WHEN type = 'INCOME' THEN amountCents ELSE -amountCents END) AS total
-           FROM transactions GROUP BY accountId"""
+        """SELECT id, SUM(total) AS total FROM (
+             SELECT accountId AS id, SUM(CASE WHEN type = 'INCOME' THEN amountCents ELSE -amountCents END) AS total
+             FROM transactions WHERE paidBy IS NULL GROUP BY accountId
+             UNION ALL
+             SELECT accountId AS id, SUM(CASE WHEN fromMe = 1 THEN -amountCents ELSE amountCents END) AS total
+             FROM settlements GROUP BY accountId
+           ) GROUP BY id"""
     )
     fun observeBalances(): Flow<List<IdSum>>
 }
@@ -259,7 +264,72 @@ interface NotificationLogDao {
 }
 
 @Dao
+interface SharingDao {
+    @Query("SELECT * FROM people ORDER BY nickname COLLATE NOCASE")
+    fun observePeople(): Flow<List<Person>>
+
+    @Query("SELECT * FROM people")
+    suspend fun getPeople(): List<Person>
+
+    @Insert
+    suspend fun insertPerson(p: Person): Long
+
+    @Update
+    suspend fun updatePerson(p: Person)
+
+    @Query("DELETE FROM people WHERE id = :id")
+    suspend fun deletePerson(id: Long)
+
+    /** True if any split, settle-up or payment refers to the person. */
+    @Query(
+        """SELECT EXISTS(SELECT 1 FROM splits WHERE personId = :id)
+           OR EXISTS(SELECT 1 FROM settlements WHERE personId = :id)
+           OR EXISTS(SELECT 1 FROM transactions WHERE paidBy = :id)"""
+    )
+    suspend fun isPersonUsed(id: Long): Boolean
+
+    @Query("SELECT * FROM splits")
+    fun observeSplits(): Flow<List<SplitPart>>
+
+    @Query("SELECT * FROM splits")
+    suspend fun getSplits(): List<SplitPart>
+
+    @Query("SELECT * FROM splits WHERE transactionId = :txId")
+    suspend fun splitsFor(txId: Long): List<SplitPart>
+
+    @Query("DELETE FROM splits WHERE transactionId = :txId")
+    suspend fun deleteSplitsFor(txId: Long)
+
+    @Insert
+    suspend fun insertSplits(parts: List<SplitPart>)
+
+    @Query("SELECT * FROM transactions WHERE id IN (SELECT transactionId FROM splits)")
+    fun observeSplitTransactions(): Flow<List<Transaction>>
+
+    @Query("SELECT * FROM settlements")
+    fun observeSettlements(): Flow<List<Settlement>>
+
+    @Query("SELECT * FROM settlements")
+    suspend fun getSettlements(): List<Settlement>
+
+    @Insert
+    suspend fun insertSettlement(s: Settlement): Long
+
+    @Update
+    suspend fun updateSettlement(s: Settlement)
+
+    @Query("DELETE FROM settlements WHERE id = :id")
+    suspend fun deleteSettlement(id: Long)
+
+    @Query("UPDATE settlements SET accountId = :to WHERE accountId = :from")
+    suspend fun reassignSettlementAccount(from: Long, to: Long)
+}
+
+@Dao
 interface BackupDao {
+    @Query("DELETE FROM settlements") suspend fun clearSettlements()
+    @Query("DELETE FROM splits") suspend fun clearSplits()
+    @Query("DELETE FROM people") suspend fun clearPeople()
     @Query("DELETE FROM transactions") suspend fun clearTransactions()
     @Query("DELETE FROM seller_rules") suspend fun clearSellerRules()
     @Query("DELETE FROM recurrences") suspend fun clearRecurrences()
@@ -273,4 +343,7 @@ interface BackupDao {
     @Insert suspend fun insertSellerRules(items: List<SellerRule>)
     @Insert suspend fun insertRecurrences(items: List<Recurrence>)
     @Insert suspend fun insertRules(items: List<NotificationRule>)
+    @Insert suspend fun insertPeople(items: List<Person>)
+    @Insert suspend fun insertSplits(items: List<SplitPart>)
+    @Insert suspend fun insertSettlements(items: List<Settlement>)
 }

@@ -11,11 +11,14 @@ data class BackupData(
     val sellerRules: List<SellerRule>,
     val rules: List<NotificationRule>,
     val recurrences: List<Recurrence> = emptyList(),
+    val people: List<Person> = emptyList(),
+    val splits: List<SplitPart> = emptyList(),
+    val settlements: List<Settlement> = emptyList(),
 )
 
 object Backup {
     const val FORMAT = "expenses-backup"
-    const val VERSION = 4
+    const val VERSION = 5
 
     fun toJson(d: BackupData): String = JSONObject().apply {
         put("format", FORMAT)
@@ -32,7 +35,19 @@ object Backup {
             JSONObject().put("id", it.id).put("timestamp", it.timestamp).put("amountCents", it.amountCents)
                 .put("type", it.type.name).put("categoryId", it.categoryId).put("accountId", it.accountId)
                 .put("note", it.note).put("merchant", it.merchant ?: JSONObject.NULL).put("source", it.source.name)
-                .put("recurrenceId", it.recurrenceId ?: JSONObject.NULL)
+                .put("recurrenceId", it.recurrenceId ?: JSONObject.NULL).put("paidBy", it.paidBy ?: JSONObject.NULL)
+        }))
+        put("people", JSONArray(d.people.map {
+            JSONObject().put("id", it.id).put("nickname", it.nickname).put("remoteId", it.remoteId ?: JSONObject.NULL)
+        }))
+        put("splits", JSONArray(d.splits.map {
+            JSONObject().put("id", it.id).put("transactionId", it.transactionId)
+                .put("personId", it.personId ?: JSONObject.NULL).put("basisPoints", it.basisPoints)
+        }))
+        put("settlements", JSONArray(d.settlements.map {
+            JSONObject().put("id", it.id).put("personId", it.personId).put("timestamp", it.timestamp)
+                .put("amountCents", it.amountCents).put("fromMe", it.fromMe).put("accountId", it.accountId)
+                .put("note", it.note)
         }))
         put("sellerRules", JSONArray(d.sellerRules.map {
             JSONObject().put("id", it.id).put("matchType", it.matchType.name).put("pattern", it.pattern)
@@ -78,6 +93,7 @@ object Backup {
                     merchant = merchant,
                     source = TxSource.valueOf(it.optString("source", TxSource.MANUAL.name)),
                     recurrenceId = if (it.isNull("recurrenceId")) null else it.getLong("recurrenceId"),
+                    paidBy = if (!it.has("paidBy") || it.isNull("paidBy")) null else it.getLong("paidBy"),
                 )
             },
             sellerRules = o.optJSONArray("sellerRules")?.objects()?.map {
@@ -112,6 +128,17 @@ object Backup {
                     categoryId = it.getLong("categoryId"), accountId = it.getLong("accountId"),
                     note = it.optString("note"), merchant = if (it.isNull("merchant")) null else it.getString("merchant"),
                 )
+            } ?: emptyList(),
+            people = o.optJSONArray("people")?.objects()?.map {
+                Person(it.getLong("id"), it.getString("nickname"), if (it.isNull("remoteId")) null else it.getString("remoteId"))
+            } ?: emptyList(),
+            splits = o.optJSONArray("splits")?.objects()?.map {
+                SplitPart(it.getLong("id"), it.getLong("transactionId"),
+                    if (it.isNull("personId")) null else it.getLong("personId"), it.getInt("basisPoints"))
+            } ?: emptyList(),
+            settlements = o.optJSONArray("settlements")?.objects()?.map {
+                Settlement(it.getLong("id"), it.getLong("personId"), it.getLong("timestamp"), it.getLong("amountCents"),
+                    it.getBoolean("fromMe"), it.getLong("accountId"), it.optString("note"))
             } ?: emptyList(),
         )
     }

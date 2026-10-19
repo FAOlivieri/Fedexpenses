@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.ShowChart
-import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material3.Icon
@@ -40,11 +40,13 @@ import io.github.faolivieri.fedexpenses.ui.screens.AccountsScreen
 import io.github.faolivieri.fedexpenses.ui.screens.CategoriesScreen
 import io.github.faolivieri.fedexpenses.ui.screens.EditTransactionScreen
 import io.github.faolivieri.fedexpenses.ui.screens.OverviewScreen
+import io.github.faolivieri.fedexpenses.ui.screens.PersonScreen
 import io.github.faolivieri.fedexpenses.ui.screens.RecurringScreen
 import io.github.faolivieri.fedexpenses.ui.screens.ReportsScreen
 import io.github.faolivieri.fedexpenses.ui.screens.RuleEditScreen
 import io.github.faolivieri.fedexpenses.ui.screens.SellerRuleEditScreen
 import io.github.faolivieri.fedexpenses.ui.screens.SettingsScreen
+import io.github.faolivieri.fedexpenses.ui.screens.SharingScreen
 import io.github.faolivieri.fedexpenses.ui.screens.TransactionsScreen
 import kotlinx.coroutines.flow.StateFlow
 
@@ -53,7 +55,7 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
     Transactions("transactions", "Transactions", Icons.AutoMirrored.Filled.ReceiptLong),
     Reports("reports", "Reports", Icons.AutoMirrored.Filled.ShowChart),
     Categories("categories", "Categories", Icons.Filled.Category),
-    Accounts("accounts", "Accounts", Icons.Filled.AccountBalanceWallet),
+    Sharing("sharing", "Sharing", Icons.Filled.Group),
 }
 
 object Routes {
@@ -63,6 +65,8 @@ object Routes {
     fun sellerRule(id: Long = 0, seller: String = "") = "sellerRule?id=$id&seller=${Uri.encode(seller)}"
     const val SETTINGS = "settings"
     const val RECURRING = "recurring"
+    const val ACCOUNTS = "accounts"
+    fun person(id: Long) = "person/$id"
 }
 
 @Composable
@@ -139,7 +143,12 @@ fun ExpensesNavHost(pendingRoute: StateFlow<String?>, onRouteConsumed: () -> Uni
                 SellerRuleEditScreen(vm, ruleId = entry.arguments?.getLong("id") ?: 0L,
                     initialSeller = entry.arguments?.getString("seller").orEmpty(), onDone = { nav.popBackStack() })
             }
-            composable(Tab.Accounts.route) { AccountsScreen(vm) }
+            composable(Tab.Sharing.route) { SharingScreen(vm, onOpenPerson = { nav.navigate(Routes.person(it)) }) }
+            composable("person/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+                PersonScreen(vm, personId = entry.arguments?.getLong("id") ?: 0L,
+                    onOpenTransaction = { nav.navigate(Routes.edit(it)) }, onBack = { nav.popBackStack() })
+            }
+            composable(Routes.ACCOUNTS) { AccountsScreen(vm, onBack = { nav.popBackStack() }) }
             composable(
                 "edit?txId={txId}&type={type}&ts={ts}&acc={acc}",
                 arguments = listOf(
@@ -164,7 +173,8 @@ fun ExpensesNavHost(pendingRoute: StateFlow<String?>, onRouteConsumed: () -> Uni
                 )
             }
             composable(Routes.SETTINGS) {
-                SettingsScreen(settingsVm, onBack = { nav.popBackStack() }, onEditRule = { nav.navigate(Routes.rule(it)) })
+                SettingsScreen(settingsVm, onBack = { nav.popBackStack() }, onEditRule = { nav.navigate(Routes.rule(it)) },
+                    onAccounts = { nav.navigate(Routes.ACCOUNTS) })
             }
             composable("rule?id={id}", arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = 0L })) { entry ->
                 RuleEditScreen(settingsVm, vm, ruleId = entry.arguments?.getLong("id") ?: 0L, onDone = { nav.popBackStack() },

@@ -91,7 +91,7 @@ import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onEditRule: (Long) -> Unit) {
+fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onEditRule: (Long) -> Unit, onAccounts: () -> Unit) {
     val context = LocalContext.current
     val rules by vm.rules.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -247,6 +247,7 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onEditRule: (Long)
             HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
             SectionTitle("General")
+            ActionRow("Accounts", "Names, colors and balances", onAccounts)
             if (s != null) {
                 var currency by remember(s.currency) { mutableStateOf(s.currency) }
                 OutlinedTextField(

@@ -53,9 +53,58 @@ data class Transaction(
     val source: TxSource = TxSource.MANUAL,
     /** The repeating series this transaction belongs to, if any. */
     val recurrenceId: Long? = null,
+    /** The [Person] who paid a split expense; null when you paid. */
+    val paidBy: Long? = null,
 ) {
     val signedCents: Long get() = if (type == TxType.EXPENSE) -amountCents else amountCents
 }
+
+/** Someone you split expenses with. [remoteId] identifies their app once they have shared something with you. */
+@Entity(tableName = "people")
+data class Person(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val nickname: String,
+    val remoteId: String? = null,
+)
+
+/** One participant's part of a split transaction. [personId] null is you. */
+@Entity(
+    tableName = "splits",
+    foreignKeys = [
+        ForeignKey(entity = Transaction::class, parentColumns = ["id"], childColumns = ["transactionId"],
+            onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = Person::class, parentColumns = ["id"], childColumns = ["personId"]),
+    ],
+    indices = [Index("transactionId"), Index("personId")],
+)
+data class SplitPart(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val transactionId: Long,
+    val personId: Long?,
+    /** Hundredths of a percent: 10000 is the whole amount. */
+    val basisPoints: Int,
+)
+
+/** Money paid between you and a person to even out what you owe each other. Not an expense or income. */
+@Entity(
+    tableName = "settlements",
+    foreignKeys = [
+        ForeignKey(entity = Person::class, parentColumns = ["id"], childColumns = ["personId"]),
+        ForeignKey(entity = Account::class, parentColumns = ["id"], childColumns = ["accountId"]),
+    ],
+    indices = [Index("personId"), Index("accountId")],
+)
+data class Settlement(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val personId: Long,
+    val timestamp: Long,
+    /** Always positive; [fromMe] gives the direction. */
+    val amountCents: Long,
+    /** True: you paid the person. False: they paid you. */
+    val fromMe: Boolean,
+    val accountId: Long,
+    val note: String = "",
+)
 
 enum class MatchType { EXACT, CONTAINS, REGEX }
 
@@ -129,12 +178,17 @@ data class CapturedNotification(
     val transactionId: Long?,
 )
 
-/** Transaction joined with its category and account, for display. */
+/** Transaction joined with its category, account and split, for display. */
 data class TxDetails(
     val tx: Transaction,
     val category: Category,
     val account: Account,
-)
+    val split: List<SplitPart> = emptyList(),
+) {
+    /** Your part of the amount; the whole amount unless the transaction is split. */
+    val myCents: Long get() = Splits.mine(tx, split)
+    val mySignedCents: Long get() = if (tx.type == TxType.EXPENSE) -myCents else myCents
+}
 
 fun normalizeMerchant(raw: String): String =
     raw.trim().lowercase().replace(Regex("\\s+"), " ")

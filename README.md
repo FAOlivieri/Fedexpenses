@@ -20,10 +20,11 @@ Everything stays on your phone: the app has **no internet permission**. Backups 
 - **Category learning**: seller rules remember which category each shop belongs to. Unknown sellers get a notification with quick category buttons.
 - **Manual entries** for expenses and income, with date, category, account, seller and note.
 - **Repeating payments**: weekly, monthly or yearly, created automatically at the start of each day they're due.
+- **Split expenses** with other people and keep a running balance with each of them.
 - **Overview** of income, expenses and balance per month or year, with a breakdown by category.
 - **Transactions** list with search and filters; expenses in red, income in green.
 - **Reports**: plot any categories, or all expenses and all income, over any range of months or years.
-- **Categories** with your own names, icons and colors (16 presets or any color); several **accounts**.
+- **Categories** with your own names, icons and colors (16 presets or any color); several **accounts** (in Settings).
 - **Backups** to Google Drive or any folder, plus CSV import and export.
 - Light and dark theme, with a choice of color palettes, your wallpaper colors (Android 12+) or any custom color, and a background that matches the palette, stays neutral, or uses its own color (Settings → Color palette / Background); works with large font and display sizes.
 
@@ -93,6 +94,15 @@ When adding or editing a transaction, set **Repeat** to weekly, monthly or yearl
 - **Month ends**: a payment on the 31st falls on the last day of shorter months.
 - **Editing one payment** of a series asks whether the change applies to *only this one* or *this and the following ones*.
 - **All series**: tap the ⟳ icon on the Transactions screen to see each one with its next date, or stop one.
+
+### Splitting expenses
+
+The **Sharing** tab lists the people you split expenses with and what each of you owes the other. Tap **+** to add someone.
+
+- **Splitting**: in an expense's editor, pick people under **Split with**. The amount is divided equally between them and you; change any percentage, and pick who paid. **Your share** appears under the amount.
+- **Reports and Overview** count only your share. An account's balance changes only when you paid; an expense someone else paid doesn't touch it.
+- **Settle up**: open a person and tap **Settle up** to record money paid between you. It moves the balance and the chosen account, without counting as spending or income.
+- Tap an expense in a person's history to edit it, or a settle-up to change or delete it.
 
 ### Watching other apps (e.g. your bank)
 

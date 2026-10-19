@@ -17,8 +17,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         NotificationRule::class,
         ProcessedNotification::class,
         CapturedNotification::class,
+        Person::class,
+        SplitPart::class,
+        Settlement::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,13 +33,14 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun rules(): RuleDao
     abstract fun notificationLog(): NotificationLogDao
     abstract fun backup(): BackupDao
+    abstract fun sharing(): SharingDao
 
     companion object {
         const val NAME = "expenses.db"
 
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
 
         /**
@@ -101,6 +105,32 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE seller_rules ADD COLUMN note TEXT")
             }
         }
+
+        /** v5 adds people, split transactions and settle-ups. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transactions ADD COLUMN paidBy INTEGER")
+                SHARING_CREATE.forEach(db::execSQL)
+            }
+        }
+
+        private val SHARING_CREATE = listOf(
+            "CREATE TABLE IF NOT EXISTS `people` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`nickname` TEXT NOT NULL, `remoteId` TEXT)",
+            "CREATE TABLE IF NOT EXISTS `splits` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`transactionId` INTEGER NOT NULL, `personId` INTEGER, `basisPoints` INTEGER NOT NULL, " +
+                "FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , " +
+                "FOREIGN KEY(`personId`) REFERENCES `people`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+            "CREATE INDEX IF NOT EXISTS `index_splits_transactionId` ON `splits` (`transactionId`)",
+            "CREATE INDEX IF NOT EXISTS `index_splits_personId` ON `splits` (`personId`)",
+            "CREATE TABLE IF NOT EXISTS `settlements` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`personId` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL, `amountCents` INTEGER NOT NULL, " +
+                "`fromMe` INTEGER NOT NULL, `accountId` INTEGER NOT NULL, `note` TEXT NOT NULL, " +
+                "FOREIGN KEY(`personId`) REFERENCES `people`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , " +
+                "FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+            "CREATE INDEX IF NOT EXISTS `index_settlements_personId` ON `settlements` (`personId`)",
+            "CREATE INDEX IF NOT EXISTS `index_settlements_accountId` ON `settlements` (`accountId`)",
+        )
 
         private const val NOTIFICATION_RULES_V4_CREATE = "CREATE TABLE IF NOT EXISTS `notification_rules_v4` (" +
             "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `packageName` TEXT NOT NULL, " +

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
@@ -48,7 +49,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountsScreen(vm: MainViewModel) {
+fun AccountsScreen(vm: MainViewModel, onBack: () -> Unit) {
     val accounts by vm.accounts.collectAsStateWithLifecycle()
     val balances by vm.accountBalances.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Account?>(null) }
@@ -58,7 +59,12 @@ fun AccountsScreen(vm: MainViewModel) {
     val money = LocalMoneyColors.current
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Accounts") }) },
+        topBar = {
+            TopAppBar(
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                title = { Text("Accounts") },
+            )
+        },
         floatingActionButton = { FloatingActionButton(onClick = { creating = true }) { Icon(Icons.Filled.Add, "New account") } },
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 88.dp)) {
@@ -82,7 +88,7 @@ fun AccountsScreen(vm: MainViewModel) {
                     Spacer(Modifier.width(16.dp))
                     Column(Modifier.weight(1f)) {
                         Text(a.name, style = MaterialTheme.typography.bodyLarge)
-                        Text("Net of all transactions", style = MaterialTheme.typography.bodySmall,
+                        Text("Net of what you paid, received and settled", style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Text(Money.formatSigned(bal), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold,

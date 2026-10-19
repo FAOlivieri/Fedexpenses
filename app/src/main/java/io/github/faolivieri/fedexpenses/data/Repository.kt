@@ -20,6 +20,7 @@ class Repository(private val db: AppDatabase) {
     private val recurringLock = Mutex()
     val rules = db.rules()
     val notificationLog = db.notificationLog()
+    private val sharing = db.sharing()
 
     private val seedLock = Mutex()
     @Volatile private var seeded = false
@@ -71,13 +72,14 @@ class Repository(private val db: AppDatabase) {
     fun observeEarliest(): Flow<Long?> = txs.observeEarliest()
 
     fun observeDetails(from: Long, to: Long): Flow<List<TxDetails>> =
-        combine(txs.observeRange(from, to), categories.observeAll(), accounts.observeAll()) { list, cats, accs ->
+        combine(txs.observeRange(from, to), categories.observeAll(), accounts.observeAll(), sharing.observeSplits()) { list, cats, accs, splits ->
             val catMap = cats.associateBy { it.id }
             val accMap = accs.associateBy { it.id }
+            val splitMap = splits.groupBy { it.transactionId }
             list.mapNotNull { t ->
                 val c = catMap[t.categoryId] ?: return@mapNotNull null
                 val a = accMap[t.accountId] ?: return@mapNotNull null
-                TxDetails(t, c, a)
+                TxDetails(t, c, a, splitMap[t.id].orEmpty())
             }
         }
 
@@ -86,11 +88,21 @@ class Repository(private val db: AppDatabase) {
 
     // --- Transactions ------------------------------------------------------------------------
 
-    suspend fun saveTransaction(tx: Transaction): Long {
-        val id = if (tx.id == 0L) txs.insert(tx) else tx.also { txs.update(it) }.id
+    /** [splits] replaces the transaction's split when given; empty means not split. */
+    suspend fun saveTransaction(tx: Transaction, splits: List<SplitPart>? = null): Long {
+        val id = db.withTransaction {
+            val id = if (tx.id == 0L) txs.insert(tx) else tx.also { txs.update(it) }.id
+            if (splits != null) {
+                sharing.deleteSplitsFor(id)
+                sharing.insertSplits(splits.map { it.copy(id = 0, transactionId = id) })
+            }
+            id
+        }
         learn(tx.merchant, tx.categoryId)
         return id
     }
+
+    suspend fun splitsFor(txId: Long): List<SplitPart> = sharing.splitsFor(txId)
 
     suspend fun deleteTransaction(id: Long) = txs.delete(id)
 
@@ -255,9 +267,33 @@ class Repository(private val db: AppDatabase) {
             txs.reassignAccount(a.id, moveTo)
             rules.reassignAccount(a.id, moveTo)
             recurrences.reassignAccount(a.id, moveTo)
+            sharing.reassignSettlementAccount(a.id, moveTo)
             accounts.delete(a)
         }
     }
+
+    // --- People and settle-ups -----------------------------------------------------------------
+
+    fun observePeople(): Flow<List<Person>> = sharing.observePeople()
+
+    /** Every person's history with you, keyed by person id. */
+    fun observeLedger(): Flow<Map<Long, List<SharedEntry>>> =
+        combine(sharing.observeSplitTransactions(), sharing.observeSplits(), sharing.observeSettlements()) { t, s, st ->
+            Splits.ledger(t, s, st)
+        }
+
+    suspend fun savePerson(p: Person): Long =
+        if (p.id == 0L) sharing.insertPerson(p) else p.also { sharing.updatePerson(it) }.id
+
+    /** Deletes a person nothing refers to; returns false if they still have splits or settle-ups. */
+    suspend fun deletePerson(id: Long): Boolean = db.withTransaction {
+        if (sharing.isPersonUsed(id)) false else { sharing.deletePerson(id); true }
+    }
+
+    suspend fun saveSettlement(s: Settlement): Long =
+        if (s.id == 0L) sharing.insertSettlement(s) else s.also { sharing.updateSettlement(it) }.id
+
+    suspend fun deleteSettlement(id: Long) = sharing.deleteSettlement(id)
 
     // --- Import / export ---------------------------------------------------------------------
 
@@ -324,7 +360,8 @@ class Repository(private val db: AppDatabase) {
     }
 
     suspend fun exportBackup(): String = Backup.toJson(
-        BackupData(categories.getAll(), accounts.getAll(), txs.getAll(), sellerRules.getAll(), rules.getAll(), recurrences.getAll())
+        BackupData(categories.getAll(), accounts.getAll(), txs.getAll(), sellerRules.getAll(), rules.getAll(), recurrences.getAll(),
+            sharing.getPeople(), sharing.getSplits(), sharing.getSettlements())
     )
 
     /** Replaces all data with the backup's contents. */
@@ -332,10 +369,15 @@ class Repository(private val db: AppDatabase) {
         val data = Backup.fromJson(json)
         val b = db.backup()
         db.withTransaction {
+            b.clearSettlements(); b.clearSplits()
             b.clearTransactions(); b.clearSellerRules(); b.clearRecurrences(); b.clearRules(); b.clearCategories(); b.clearAccounts()
+            b.clearPeople()
             b.insertCategories(data.categories)
             b.insertAccounts(data.accounts)
+            b.insertPeople(data.people)
             b.insertTransactions(data.transactions)
+            b.insertSplits(data.splits)
+            b.insertSettlements(data.settlements)
             b.insertSellerRules(data.sellerRules)
             b.insertRecurrences(data.recurrences)
             b.insertRules(data.rules)

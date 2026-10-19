@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.EventRepeat
@@ -135,8 +136,8 @@ fun TransactionsScreen(vm: MainViewModel, onOpen: (Long) -> Unit, onAdd: (TxType
             item { PeriodSelector(period, { vm.period.value = it }) }
             if (filter.isActive) item { ActiveFilters(vm, filter) }
             if (items != null) item {
-                val exp = items.filter { it.tx.type == TxType.EXPENSE }.sumOf { it.tx.amountCents }
-                val inc = items.filter { it.tx.type == TxType.INCOME }.sumOf { it.tx.amountCents }
+                val exp = items.filter { it.tx.type == TxType.EXPENSE }.sumOf { it.myCents }
+                val inc = items.filter { it.tx.type == TxType.INCOME }.sumOf { it.myCents }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
                     Text("${items.size} transactions", style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
@@ -150,7 +151,7 @@ fun TransactionsScreen(vm: MainViewModel, onOpen: (Long) -> Unit, onAdd: (TxType
             }
             grouped?.forEach { (day, txs) ->
                 stickyHeader(key = day.toString(), contentType = "day") {
-                    val net = txs.sumOf { it.tx.signedCents }
+                    val net = txs.sumOf { it.mySignedCents }
                     Row(
                         Modifier.fillMaxWidth()
                             .background(MaterialTheme.colorScheme.surface)
@@ -196,6 +197,9 @@ fun TransactionRow(d: TxDetails, showAccount: Boolean, onClick: () -> Unit) {
                 DetailLine(Icons.AutoMirrored.Filled.Notes, note, MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (showAccount) DetailLine(Icons.Filled.AccountBalanceWallet, d.account.name, MaterialTheme.colorScheme.onSurfaceVariant)
+            if (d.split.isNotEmpty()) {
+                DetailLine(Icons.Filled.Group, "Your share " + Money.format(d.myCents), MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         Spacer(Modifier.width(8.dp))
         if (d.tx.recurrenceId != null || d.tx.source == TxSource.RECURRING) {
