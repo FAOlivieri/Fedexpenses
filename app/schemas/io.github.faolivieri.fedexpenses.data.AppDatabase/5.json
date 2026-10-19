@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "22dc20d9b416f5aead6a3e98b781de24",
+    "identityHash": "1fdc06ada661b7b6ec9184877d4f03a9",
     "entities": [
       {
         "tableName": "categories",
@@ -556,7 +556,7 @@
       },
       {
         "tableName": "people",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nickname` TEXT NOT NULL, `remoteId` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nickname` TEXT NOT NULL, `remoteId` TEXT, `startingBalanceCents` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -575,6 +575,12 @@
             "columnName": "remoteId",
             "affinity": "TEXT",
             "notNull": false
+          },
+          {
+            "fieldPath": "startingBalanceCents",
+            "columnName": "startingBalanceCents",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -768,7 +774,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '22dc20d9b416f5aead6a3e98b781de24')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1fdc06ada661b7b6ec9184877d4f03a9')"
     ]
   }
 }

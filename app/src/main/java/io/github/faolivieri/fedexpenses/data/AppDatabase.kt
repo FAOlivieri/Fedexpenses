@@ -116,7 +116,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         private val SHARING_CREATE = listOf(
             "CREATE TABLE IF NOT EXISTS `people` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                "`nickname` TEXT NOT NULL, `remoteId` TEXT)",
+                "`nickname` TEXT NOT NULL, `remoteId` TEXT, `startingBalanceCents` INTEGER NOT NULL)",
             "CREATE TABLE IF NOT EXISTS `splits` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                 "`transactionId` INTEGER NOT NULL, `personId` INTEGER, `basisPoints` INTEGER NOT NULL, " +
                 "FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , " +

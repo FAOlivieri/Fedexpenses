@@ -101,7 +101,9 @@ The **Sharing** tab lists the people you split expenses with and what each of yo
 
 - **Splitting**: in an expense's editor, pick people under **Split with**. The amount is divided equally between them and you; change any percentage, and pick who paid. **Your share** appears under the amount.
 - **Reports and Overview** count only your share. An account's balance changes only when you paid; an expense someone else paid doesn't touch it.
-- **Settle up**: open a person and tap **Settle up** to record money paid between you. It moves the balance and the chosen account, without counting as spending or income.
+- **Starting balance**: when adding or editing a person, enter what you already owed each other before tracking it here (e.g. from another app). It counts in the balance only, never in accounts or reports.
+- **Settle up**: open a person and tap **Settle up** to record money paid between you, for the full balance or any part of it, on any date. It moves the balance and the chosen account, without counting as spending or income.
+- Repeating payments can't be split; split each occurrence instead.
 - Tap an expense in a person's history to edit it, or a settle-up to change or delete it.
 
 ### Watching other apps (e.g. your bank)

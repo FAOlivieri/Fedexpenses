@@ -39,6 +39,7 @@ object Backup {
         }))
         put("people", JSONArray(d.people.map {
             JSONObject().put("id", it.id).put("nickname", it.nickname).put("remoteId", it.remoteId ?: JSONObject.NULL)
+                .put("startingBalanceCents", it.startingBalanceCents)
         }))
         put("splits", JSONArray(d.splits.map {
             JSONObject().put("id", it.id).put("transactionId", it.transactionId)
@@ -130,7 +131,8 @@ object Backup {
                 )
             } ?: emptyList(),
             people = o.optJSONArray("people")?.objects()?.map {
-                Person(it.getLong("id"), it.getString("nickname"), if (it.isNull("remoteId")) null else it.getString("remoteId"))
+                Person(it.getLong("id"), it.getString("nickname"), if (it.isNull("remoteId")) null else it.getString("remoteId"),
+                    it.optLong("startingBalanceCents", 0))
             } ?: emptyList(),
             splits = o.optJSONArray("splits")?.objects()?.map {
                 SplitPart(it.getLong("id"), it.getLong("transactionId"),

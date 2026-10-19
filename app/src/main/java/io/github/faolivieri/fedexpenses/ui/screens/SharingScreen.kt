@@ -2,6 +2,7 @@ package io.github.faolivieri.fedexpenses.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,12 +23,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -40,8 +45,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,8 +73,12 @@ import io.github.faolivieri.fedexpenses.ui.theme.LocalMoneyColors
 import io.github.faolivieri.fedexpenses.util.Dates
 import io.github.faolivieri.fedexpenses.util.Money
 import io.github.faolivieri.fedexpenses.util.toLocalDate
+import io.github.faolivieri.fedexpenses.util.toMillis
+import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.sign
 
 /** People you split expenses with, and what each of you owes the other. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,9 +115,9 @@ fun SharingScreen(vm: MainViewModel, onOpenPerson: (Long) -> Unit) {
     }
 
     if (adding) {
-        PersonDialog(null, onDismiss = { adding = false }, onSave = { name ->
+        PersonDialog(null, onDismiss = { adding = false }, onSave = { name, starting ->
             adding = false
-            scope.launch { vm.savePerson(Person(nickname = name)) }
+            scope.launch { vm.savePerson(Person(nickname = name, startingBalanceCents = starting)) }
         })
     }
 }
@@ -150,12 +161,14 @@ fun PersonScreen(vm: MainViewModel, personId: Long, onOpenTransaction: (Long) ->
                 when (e) {
                     is SharedEntry.Expense -> "t${e.tx.id}"
                     is SharedEntry.Payment -> "s${e.settlement.id}"
+                    is SharedEntry.Starting -> "start"
                 }
             }) { e ->
                 EntryRow(e, person, onClick = {
                     when (e) {
                         is SharedEntry.Expense -> onOpenTransaction(e.tx.id)
                         is SharedEntry.Payment -> settling = e.settlement
+                        is SharedEntry.Starting -> editing = true
                     }
                 })
             }
@@ -166,7 +179,10 @@ fun PersonScreen(vm: MainViewModel, personId: Long, onOpenTransaction: (Long) ->
         PersonDialog(
             person,
             onDismiss = { editing = false },
-            onSave = { name -> editing = false; scope.launch { vm.savePerson(person.copy(nickname = name)) } },
+            onSave = { name, starting ->
+                editing = false
+                scope.launch { vm.savePerson(person.copy(nickname = name, startingBalanceCents = starting)) }
+            },
             onDelete = {
                 scope.launch {
                     if (vm.deletePerson(person.id)) {
@@ -199,8 +215,14 @@ private fun EntryRow(e: SharedEntry, person: Person, onClick: () -> Unit) {
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(if (e is SharedEntry.Payment) Icons.Filled.Payments else Icons.Filled.Group, null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(
+            when (e) {
+                is SharedEntry.Payment -> Icons.Filled.Payments
+                is SharedEntry.Starting -> Icons.Filled.Flag
+                is SharedEntry.Expense -> Icons.Filled.Group
+            },
+            null, tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             val (title, detail) = when (e) {
@@ -217,10 +239,14 @@ private fun EntryRow(e: SharedEntry, person: Person, onClick: () -> Unit) {
                     val s = e.settlement
                     (if (s.fromMe) "You paid $nickname" else "$nickname paid you") to s.note.ifBlank { "Settle-up" }
                 }
+                is SharedEntry.Starting -> "Starting balance" to "Carried over · tap to change"
             }
             Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(Dates.short(e.timestamp.toLocalDate()) + " · " + detail, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                if (e is SharedEntry.Starting) detail else Dates.short(e.timestamp.toLocalDate()) + " · " + detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
         }
         Spacer(Modifier.width(8.dp))
         Text(Money.formatSigned(e.owedCents), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold,
@@ -263,19 +289,49 @@ private fun PersonBadge(nickname: String) {
     }
 }
 
-/** Adds a person, or renames / deletes [initial]. */
+/**
+ * Adds a person, or renames / deletes [initial]. [onSave] gets the nickname and the starting balance
+ * (positive: they owe you).
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PersonDialog(initial: Person?, onDismiss: () -> Unit, onSave: (String) -> Unit, onDelete: (() -> Unit)? = null) {
+fun PersonDialog(initial: Person?, onDismiss: () -> Unit, onSave: (String, Long) -> Unit, onDelete: (() -> Unit)? = null) {
     var name by remember { mutableStateOf(initial?.nickname.orEmpty()) }
+    val start = initial?.startingBalanceCents ?: 0L
+    // 0 = no starting balance, 1 = they owe you, -1 = you owe them
+    var direction by remember { mutableIntStateOf(start.sign) }
+    var amount by remember { mutableStateOf(if (start == 0L) "" else Money.editable(abs(start))) }
+    val cents = Money.parseCents(amount)
+    val valid = name.isNotBlank() && (direction == 0 || (cents != null && cents > 0))
+    val who = name.trim().ifEmpty { "They" }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initial == null) "Add person" else "Edit person") },
         text = {
-            OutlinedTextField(name, { name = it }, label = { Text("Nickname") }, singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words))
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Nickname") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words))
+                Text("Starting balance", style = MaterialTheme.typography.labelLarge)
+                Text("What you already owed each other before tracking it here, e.g. from another app.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(direction == 0, { direction = 0 }, label = { Text("None") })
+                    FilterChip(direction == 1, { direction = 1 }, label = { Text("$who owes you") })
+                    FilterChip(direction == -1, { direction = -1 }, label = { Text("You owe $who") })
+                }
+                if (direction != 0) {
+                    OutlinedTextField(
+                        amount, { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
+                        label = { Text("Amount") }, suffix = { Text(Money.symbol) }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    )
+                }
+            }
         },
         confirmButton = {
-            TextButton(enabled = name.isNotBlank(), onClick = { onSave(name.trim()) }) { Text("Save") }
+            TextButton(enabled = valid, onClick = {
+                onSave(name.trim(), if (direction == 0) 0L else direction * cents!!)
+            }) { Text("Save") }
         },
         dismissButton = {
             Row {
@@ -287,7 +343,7 @@ fun PersonDialog(initial: Person?, onDismiss: () -> Unit, onSave: (String) -> Un
 }
 
 /** Records money paid between you and [person], or edits / deletes [initial]. */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun SettleDialog(
     initial: Settlement?, person: Person, balance: Long, accounts: List<Account>,
@@ -296,6 +352,8 @@ private fun SettleDialog(
     var amount by remember { mutableStateOf(Money.editable(initial?.amountCents ?: abs(balance))) }
     var fromMe by remember { mutableStateOf(initial?.fromMe ?: (balance < 0)) }
     var accountId by remember { mutableLongStateOf(initial?.accountId ?: accounts.firstOrNull()?.id ?: 0L) }
+    var date by remember { mutableStateOf(initial?.timestamp?.toLocalDate() ?: LocalDate.now()) }
+    var pickingDate by remember { mutableStateOf(false) }
     val cents = Money.parseCents(amount)
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -311,6 +369,16 @@ private fun SettleDialog(
                     label = { Text("Amount") }, suffix = { Text(Money.symbol) }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
+                Row(
+                    Modifier.fillMaxWidth().clickable { pickingDate = true }
+                        .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.extraSmall)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.CalendarMonth, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(12.dp))
+                    Text(Dates.dayHeader(date), style = MaterialTheme.typography.bodyLarge)
+                }
                 Text("Account", style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     accounts.forEach { a -> FilterChip(a.id == accountId, { accountId = a.id }, label = { Text(a.name) }) }
@@ -319,9 +387,13 @@ private fun SettleDialog(
         },
         confirmButton = {
             TextButton(enabled = cents != null && cents > 0 && accountId != 0L, onClick = {
-                onSave((initial ?: Settlement(personId = person.id, timestamp = System.currentTimeMillis(),
+                // Keep the time of day (the original one when editing) so same-day order stays natural.
+                val base = initial?.timestamp ?: System.currentTimeMillis()
+                val timeOfDay = base - base.toLocalDate().toMillis()
+                onSave((initial ?: Settlement(personId = person.id, timestamp = 0,
                     amountCents = 0, fromMe = fromMe, accountId = accountId))
-                    .copy(amountCents = cents!!, fromMe = fromMe, accountId = accountId))
+                    .copy(amountCents = cents!!, fromMe = fromMe, accountId = accountId,
+                        timestamp = date.toMillis() + timeOfDay))
             }) { Text("Save") }
         },
         dismissButton = {
@@ -333,4 +405,20 @@ private fun SettleDialog(
             }
         },
     )
+
+    if (pickingDate) {
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = date.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { pickingDate = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { date = LocalDate.ofEpochDay(it / 86_400_000) }
+                    pickingDate = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { pickingDate = false }) { Text("Cancel") } },
+        ) { DatePicker(state) }
+    }
 }

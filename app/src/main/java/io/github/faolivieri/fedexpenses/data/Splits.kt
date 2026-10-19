@@ -14,6 +14,11 @@ sealed interface SharedEntry {
         override val timestamp get() = settlement.timestamp
         override val owedCents get() = Splits.owed(settlement)
     }
+
+    /** The balance carried over when you started tracking; always the oldest entry. */
+    data class Starting(override val owedCents: Long) : SharedEntry {
+        override val timestamp get() = Long.MIN_VALUE
+    }
 }
 
 object Splits {
@@ -50,8 +55,14 @@ object Splits {
 
     fun owed(s: Settlement): Long = if (s.fromMe) s.amountCents else -s.amountCents
 
-    /** Each person's history, newest first. Only people with at least one entry appear. */
-    fun ledger(txs: List<Transaction>, splits: List<SplitPart>, settlements: List<Settlement>): Map<Long, List<SharedEntry>> {
+    /**
+     * Each person's history, newest first, ending with their starting balance (from [people]) if any.
+     * Only people with at least one entry appear.
+     */
+    fun ledger(
+        txs: List<Transaction>, splits: List<SplitPart>, settlements: List<Settlement>,
+        people: List<Person> = emptyList(),
+    ): Map<Long, List<SharedEntry>> {
         val byTx = splits.groupBy { it.transactionId }
         val out = HashMap<Long, MutableList<SharedEntry>>()
         for (tx in txs) {
@@ -63,6 +74,9 @@ object Splits {
             }
         }
         for (st in settlements) out.getOrPut(st.personId) { mutableListOf() } += SharedEntry.Payment(st)
+        for (p in people) {
+            if (p.startingBalanceCents != 0L) out.getOrPut(p.id) { mutableListOf() } += SharedEntry.Starting(p.startingBalanceCents)
+        }
         return out.mapValues { (_, l) -> l.sortedByDescending { it.timestamp } }
     }
 }

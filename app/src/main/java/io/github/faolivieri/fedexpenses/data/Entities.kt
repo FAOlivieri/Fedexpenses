@@ -65,6 +65,11 @@ data class Person(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val nickname: String,
     val remoteId: String? = null,
+    /**
+     * Balance carried over from before you tracked it here (e.g. from another app): positive when
+     * they owe you, negative when you owe them. Counts in the balance only, never in accounts or reports.
+     */
+    val startingBalanceCents: Long = 0,
 )
 
 /** One participant's part of a split transaction. [personId] null is you. */

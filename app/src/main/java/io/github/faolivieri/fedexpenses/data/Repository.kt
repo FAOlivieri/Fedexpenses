@@ -278,8 +278,9 @@ class Repository(private val db: AppDatabase) {
 
     /** Every person's history with you, keyed by person id. */
     fun observeLedger(): Flow<Map<Long, List<SharedEntry>>> =
-        combine(sharing.observeSplitTransactions(), sharing.observeSplits(), sharing.observeSettlements()) { t, s, st ->
-            Splits.ledger(t, s, st)
+        combine(sharing.observeSplitTransactions(), sharing.observeSplits(), sharing.observeSettlements(),
+            sharing.observePeople()) { t, s, st, people ->
+            Splits.ledger(t, s, st, people)
         }
 
     suspend fun savePerson(p: Person): Long =

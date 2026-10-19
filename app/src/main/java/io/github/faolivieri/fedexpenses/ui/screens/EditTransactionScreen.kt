@@ -391,10 +391,10 @@ fun EditTransactionScreen(
     }
 
     if (newPerson) {
-        PersonDialog(null, onDismiss = { newPerson = false }, onSave = { name ->
+        PersonDialog(null, onDismiss = { newPerson = false }, onSave = { name, starting ->
             newPerson = false
             scope.launch {
-                val id = vm.savePerson(Person(nickname = name))
+                val id = vm.savePerson(Person(nickname = name, startingBalanceCents = starting))
                 split = toggled(split, id)
             }
         })

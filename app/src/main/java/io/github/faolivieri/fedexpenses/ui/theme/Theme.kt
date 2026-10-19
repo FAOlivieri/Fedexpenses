@@ -235,14 +235,31 @@ fun schemeFor(choice: ThemeChoice, dark: Boolean, wallpaper: ColorScheme?): Colo
         Backgrounds.NEUTRAL -> accent.withNeutralSurfaces(dark)
         Backgrounds.CUSTOM -> {
             val (h, s) = hueSat(Color(choice.backgroundColor))
-            accent.withTintedSurfaces(h, s.coerceAtMost(0.9f), dark)
+            accent.withTintedSurfaces(h, s.coerceAtMost(0.9f), dark).withVisibleSelection(dark)
         }
         // Wallpaper colors come with their own matching surfaces.
         else -> if (accent === wallpaper) accent else {
             val (h, s) = hueSat(Palettes.seedOf(choice))
-            accent.withTintedSurfaces(h, s.coerceAtMost(0.85f) * 0.55f, dark)
+            accent.withTintedSurfaces(h, s.coerceAtMost(0.85f) * 0.55f, dark).withVisibleSelection(dark)
         }
     }
+}
+
+/**
+ * Selected chips, segmented buttons and the bottom-bar indicator use secondaryContainer. On tinted
+ * surfaces the pale default blends into dialogs and cards, so make it a clearly stronger tint of the
+ * accent, still with dark text in light mode and light text in dark mode.
+ */
+private fun ColorScheme.withVisibleSelection(dark: Boolean): ColorScheme {
+    val (h, s) = hueSat(primary)
+    val sat = (s * 0.6f).coerceAtMost(0.6f)
+    return if (!dark) copy(
+        secondaryContainer = withLuminance(h, sat, 0.60f),
+        onSecondaryContainer = withLuminance(h, sat, 0.025f),
+    ) else copy(
+        secondaryContainer = withLuminance(h, sat, 0.13f),
+        onSecondaryContainer = withLuminance(h, sat * 0.5f, 0.80f),
+    )
 }
 
 @Composable
