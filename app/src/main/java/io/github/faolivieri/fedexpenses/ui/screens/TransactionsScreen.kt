@@ -100,6 +100,7 @@ fun TransactionsScreen(vm: MainViewModel, onOpen: (Long) -> Unit, onAdd: (TxType
     var showFilters by remember { mutableStateOf(false) }
     val money = LocalMoneyColors.current
     val people by vm.people.collectAsStateWithLifecycle()
+    val names = people.associate { it.id to it.nickname }
     /** Transactions selected with a long-press, for splitting or sharing several at once. */
     var selected by remember { mutableStateOf(setOf<Long>()) }
     var splitting by remember { mutableStateOf(false) }
@@ -204,7 +205,7 @@ fun TransactionsScreen(vm: MainViewModel, onOpen: (Long) -> Unit, onAdd: (TxType
                 }
                 items(txs, key = { it.tx.id }, contentType = { "tx" }) { d ->
                     TransactionRow(
-                        d, showAccount = accounts.size > 1, selected = d.tx.id in selected,
+                        d, showAccount = accounts.size > 1, names = names, selected = d.tx.id in selected,
                         onLongClick = { selected = if (d.tx.id in selected) selected - d.tx.id else selected + d.tx.id },
                     ) {
                         if (selected.isEmpty()) onOpen(d.tx.id)
@@ -241,7 +242,8 @@ fun TransactionsScreen(vm: MainViewModel, onOpen: (Long) -> Unit, onAdd: (TxType
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TransactionRow(
-    d: TxDetails, showAccount: Boolean, selected: Boolean = false, onLongClick: (() -> Unit)? = null, onClick: () -> Unit,
+    d: TxDetails, showAccount: Boolean, names: Map<Long, String> = emptyMap(), selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null, onClick: () -> Unit,
 ) {
     Row(
         Modifier.fillMaxWidth()
@@ -263,7 +265,7 @@ fun TransactionRow(
             }
             if (showAccount) DetailLine(Icons.Filled.AccountBalanceWallet, d.account.name, MaterialTheme.colorScheme.onSurfaceVariant)
             if (d.split.isNotEmpty()) {
-                DetailLine(Icons.Filled.Group, "Your share " + Money.format(d.myCents), MaterialTheme.colorScheme.onSurfaceVariant)
+                DetailLine(Icons.Filled.Group, splitSummary(d, names), MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
             }
         }
         Spacer(Modifier.width(8.dp))
@@ -276,18 +278,26 @@ fun TransactionRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
         }
-        SignedAmount(d.tx.amountCents, d.tx.type)
+        SignedAmount(d.myCents, d.tx.type)
     }
 }
 
 /** One secondary line of a transaction row: a small icon and single-line text. */
 @Composable
-private fun DetailLine(icon: ImageVector, text: String, color: Color) {
+private fun DetailLine(icon: ImageVector, text: String, color: Color, maxLines: Int = 1) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(6.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = color, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
     }
+}
+
+/** "Total 24.32 € shared with Ana and Marko. Paid by Ana" */
+private fun splitSummary(d: TxDetails, names: Map<Long, String>): String {
+    val others = d.split.mapNotNull { it.personId }.map { names[it] ?: "someone" }
+    val with = if (others.size <= 1) others.joinToString() else others.dropLast(1).joinToString() + " and " + others.last()
+    val payer = d.tx.paidBy?.let { names[it] ?: "someone else" } ?: "you"
+    return "Total ${Money.format(d.tx.amountCents)} shared with $with. Paid by $payer"
 }
 
 @OptIn(ExperimentalLayoutApi::class)

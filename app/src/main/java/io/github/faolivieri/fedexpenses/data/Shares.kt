@@ -31,7 +31,29 @@ data class ShareItem(
     val recipientCents: Long get() = parts[to.toLong()] ?: 0
 }
 
-data class SharePayload(val fromId: String, val fromName: String, val items: List<ShareItem>)
+/** A settle-up between the sender and the recipient. [fromSender]: the sender paid the recipient. */
+data class SharePayment(
+    val shareId: String,
+    val version: Int,
+    val timestamp: Long,
+    val amountCents: Long,
+    val fromSender: Boolean,
+    val note: String,
+)
+
+/**
+ * What one phone sends to one person. [startingCents] is the sender's starting balance with the recipient
+ * (positive: the recipient owes the sender), or null if it isn't included.
+ */
+data class SharePayload(
+    val fromId: String,
+    val fromName: String,
+    val items: List<ShareItem>,
+    val payments: List<SharePayment> = emptyList(),
+    val startingCents: Long? = null,
+) {
+    val isEmpty get() = items.isEmpty() && payments.isEmpty() && startingCents == null
+}
 
 /** What to do with a received item. LINK attaches it to the possible duplicate instead of adding it. */
 enum class ImportChoice { ADD, LINK, SKIP }
@@ -40,6 +62,12 @@ enum class IncomingKind { NEW, UPDATE, ALREADY_ADDED, POSSIBLE_DUPLICATE }
 
 /** A received item and how it relates to what's already on this phone. */
 data class Incoming(val item: ShareItem, val kind: IncomingKind, val existing: Transaction? = null)
+
+/** A received settle-up and how it relates to what's already on this phone. */
+data class IncomingPayment(val payment: SharePayment, val kind: IncomingKind, val existing: Settlement? = null)
+
+/** A received share compared with this phone's data. [sender] is null the first time they share. */
+data class SharePreview(val items: List<Incoming>, val payments: List<IncomingPayment>, val sender: Person?)
 
 object Shares {
     const val FORMAT = "fedexpenses-share"
@@ -55,6 +83,11 @@ object Shares {
                 }))
                 .put("to", i.to).put("paid", i.paidBy)
         }))
+        put("payments", JSONArray(p.payments.map {
+            JSONObject().put("id", it.shareId).put("ver", it.version).put("ts", it.timestamp).put("amount", it.amountCents)
+                .put("fromSender", it.fromSender).put("note", it.note)
+        }))
+        p.startingCents?.let { put("starting", it) }
     }.toString()
 
     /** Reads and validates a payload; throws [IllegalArgumentException] if it isn't a valid share. */
@@ -86,7 +119,40 @@ object Shares {
                     require(item.to in people.indices && item.paidBy in people.indices)
                 }
             },
+            payments = o.optJSONArray("payments")?.let { a ->
+                (0 until a.length()).map { n ->
+                    val i = a.getJSONObject(n)
+                    SharePayment(
+                        shareId = i.getString("id"), version = i.getInt("ver"), timestamp = i.getLong("ts"),
+                        amountCents = i.getLong("amount"), fromSender = i.getBoolean("fromSender"), note = i.optString("note"),
+                    ).also { require(it.shareId.isNotBlank() && it.amountCents in 1..100_000_000_000L) }
+                }
+            }.orEmpty(),
+            startingCents = if (o.has("starting")) o.getLong("starting") else null,
         )
+    }
+
+    /**
+     * Compares received settle-ups with this phone's: same [Settlement.shareId] means already added (or an
+     * update, if the received version is newer); otherwise an unshared settle-up with [senderId] for the same
+     * amount and direction within a day of it is a possible duplicate.
+     */
+    fun classifyPayments(
+        payments: List<SharePayment>, existing: List<Settlement>, senderId: Long?,
+        dayOf: (Long) -> LocalDate = { it.toLocalDate() },
+    ): List<IncomingPayment> = payments.map { p ->
+        val same = existing.firstOrNull { it.shareId == p.shareId }
+        when {
+            same != null -> IncomingPayment(p, if (p.version > same.shareVersion) IncomingKind.UPDATE else IncomingKind.ALREADY_ADDED, same)
+            else -> {
+                val day = dayOf(p.timestamp)
+                val dup = existing.firstOrNull {
+                    it.shareId == null && it.personId == senderId && it.amountCents == p.amountCents &&
+                        it.fromMe == !p.fromSender && abs(ChronoUnit.DAYS.between(dayOf(it.timestamp), day)) <= 1
+                }
+                if (dup != null) IncomingPayment(p, IncomingKind.POSSIBLE_DUPLICATE, dup) else IncomingPayment(p, IncomingKind.NEW)
+            }
+        }
     }
 
     /**

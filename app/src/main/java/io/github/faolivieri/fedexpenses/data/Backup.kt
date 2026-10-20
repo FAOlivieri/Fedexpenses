@@ -21,7 +21,7 @@ data class BackupData(
 
 object Backup {
     const val FORMAT = "expenses-backup"
-    const val VERSION = 6
+    const val VERSION = 7
 
     fun toJson(d: BackupData): String = JSONObject().apply {
         put("format", FORMAT)
@@ -53,7 +53,7 @@ object Backup {
         put("settlements", JSONArray(d.settlements.map {
             JSONObject().put("id", it.id).put("personId", it.personId).put("timestamp", it.timestamp)
                 .put("amountCents", it.amountCents).put("fromMe", it.fromMe).put("accountId", it.accountId)
-                .put("note", it.note)
+                .put("note", it.note).put("shareId", it.shareId ?: JSONObject.NULL).put("shareVersion", it.shareVersion)
         }))
         put("sellerRules", JSONArray(d.sellerRules.map {
             JSONObject().put("id", it.id).put("matchType", it.matchType.name).put("pattern", it.pattern)
@@ -149,7 +149,8 @@ object Backup {
             } ?: emptyList(),
             settlements = o.optJSONArray("settlements")?.objects()?.map {
                 Settlement(it.getLong("id"), it.getLong("personId"), it.getLong("timestamp"), it.getLong("amountCents"),
-                    it.getBoolean("fromMe"), it.getLong("accountId"), it.optString("note"))
+                    it.getBoolean("fromMe"), it.getLong("accountId"), it.optString("note"),
+                    if (!it.has("shareId") || it.isNull("shareId")) null else it.getString("shareId"), it.optInt("shareVersion"))
             } ?: emptyList(),
         )
     }

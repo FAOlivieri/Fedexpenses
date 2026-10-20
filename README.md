@@ -100,7 +100,7 @@ When adding or editing a transaction, set **Repeat** to weekly, monthly or yearl
 The **Sharing** tab lists the people you split expenses with and what each of you owes the other. Tap **+** to add someone.
 
 - **Splitting**: in an expense's editor, pick people under **Split with**. The amount is divided equally between them and you; change any percentage, and pick who paid. **Your share** appears under the amount.
-- **Reports and Overview** count only your share. An account's balance changes only when you paid; an expense someone else paid doesn't touch it.
+- **Reports, Overview and the Transactions list** count only your share; a split transaction shows the total, who it was shared with and who paid underneath. An account's balance changes only when you paid; an expense someone else paid doesn't touch it.
 - **Starting balance**: when adding or editing a person, enter what you already owed each other before tracking it here (e.g. from another app). It counts in the balance only, never in accounts or reports.
 - **Settle up**: open a person and tap **Settle up** to record money paid between you, for the full balance or any part of it, on any date. It moves the balance and the chosen account, without counting as spending or income.
 - Repeating payments can't be split; split each occurrence instead.
@@ -108,17 +108,18 @@ The **Sharing** tab lists the people you split expenses with and what each of yo
 
 ### Sending shared expenses to other people
 
-Shared expenses travel as small files through any messaging app or email; Fedexpenses itself still never goes online and no website is involved. The first time you share, the app asks for **your name** (also in **Settings → General**).
+Shared expenses travel as small `.fedexpenses` files through any messaging app or email; Fedexpenses itself still never goes online and no website is involved. The first time you share, the app asks for **your name** (also in **Settings → General**).
 
 - **One expense**: in its editor, tap **Save and share with …** and send the file to that person.
-- **Several expenses**: long-press transactions in the **Transactions** tab (or in a person's history) to select them, then tap **Share**. They're sent together in one file, e.g. at the end of a trip. A person's screen also has a **Share** button that sends everything you split with them.
+- **Several expenses**: long-press transactions in the **Transactions** tab (or in a person's history) to select them, then tap **Share**. They're sent together in one file, e.g. at the end of a trip. A person's screen also has a **Share** button that sends everything with them: split expenses, settle-ups and your starting balance. In their history you can also select settle-ups and the starting balance.
 - **Splitting several at once**: select transactions and tap the **people** icon to split them all equally and set who paid.
-- **Receiving**: tap the file in the chat and open it with Fedexpenses, or save it and tap **Open file** at the top of the **Sharing** tab. A review screen shows each expense and your part:
+- **Receiving**: tap the file in the chat and open it with Fedexpenses (choose **Always** to skip the question next time; it only applies to Fedexpenses files), or save it and tap **Import transaction** at the top of the **Sharing** tab. A review screen shows each expense and your part:
   - The first time someone shares with you, pick them from your people (or add them as new) so their balance stays together.
   - **Already added** expenses are skipped, and ones the sender changed since replace your copy.
   - **Possible duplicates** (an expense of yours with the same amount within a day, e.g. one your bank notification already recorded) can be split instead of added twice.
 - Received expenses get a category from your seller rules (or *Uncategorized*) and your first account; change them like any other.
-- Settle-ups and deletions aren't sent: record those on both phones.
+- Settle-ups arrive from the other side ("You paid Ana" becomes "Federico paid you"), and a starting balance can replace yours after you confirm.
+- Deletions aren't sent: delete on both phones.
 
 ### Watching other apps (e.g. your bank)
 

@@ -293,17 +293,22 @@ class Repository(private val db: AppDatabase, private val settings: Settings) {
     }
 
     suspend fun saveSettlement(s: Settlement): Long =
-        if (s.id == 0L) sharing.insertSettlement(s) else s.also { sharing.updateSettlement(it) }.id
+        if (s.id == 0L) sharing.insertSettlement(s)
+        else s.copy(shareVersion = if (s.shareId != null) s.shareVersion + 1 else s.shareVersion)
+            .also { sharing.updateSettlement(it) }.id
 
     suspend fun deleteSettlement(id: Long) = sharing.deleteSettlement(id)
 
     // --- Sharing between phones ----------------------------------------------------------------
 
     /**
-     * The expenses among [txIds] that are split with [personId], addressed to them. Each gets a share id
-     * the first time it is shared.
+     * What to send to [personId]: the expenses among [txIds] split with them, the settle-ups among
+     * [settlementIds] with them and, with [includeStarting], your starting balance with them. Expenses and
+     * settle-ups get a share id the first time they are shared.
      */
-    suspend fun buildShare(personId: Long, txIds: List<Long>): SharePayload = db.withTransaction {
+    suspend fun buildShare(
+        personId: Long, txIds: List<Long>, settlementIds: List<Long> = emptyList(), includeStarting: Boolean = false,
+    ): SharePayload = db.withTransaction {
         val people = sharing.getPeople().associateBy { it.id }
         val items = txIds.mapNotNull { id ->
             var tx = txs.get(id) ?: return@mapNotNull null
@@ -322,19 +327,30 @@ class Repository(private val db: AppDatabase, private val settings: Settings) {
                 to = to, paidBy = parts.indexOfFirst { it.personId == tx.paidBy }.coerceAtLeast(0),
             )
         }
-        SharePayload(settings.myId, settings.myNickname, items)
+        val payments = sharing.getSettlements().filter { it.personId == personId && it.id in settlementIds }.map {
+            val s = if (it.shareId == null) it.copy(shareId = UUID.randomUUID().toString()).also { s -> sharing.updateSettlement(s) } else it
+            SharePayment(s.shareId!!, s.shareVersion, s.timestamp, s.amountCents, fromSender = s.fromMe, note = s.note)
+        }
+        val starting = people[personId]?.startingBalanceCents?.takeIf { includeStarting && it != 0L }
+        SharePayload(settings.myId, settings.myNickname, items, payments, starting)
     }
 
-    suspend fun previewShare(p: SharePayload): List<Incoming> = Shares.classify(p.items, txs.getAll())
-
-    /** The person whose phone sent [p], if they have sent you something before. */
-    suspend fun senderOf(p: SharePayload): Person? = sharing.getPeople().firstOrNull { it.remoteId == p.fromId }
+    /** Compares a received share with this phone's data. */
+    suspend fun previewShare(p: SharePayload): SharePreview {
+        val sender = sharing.getPeople().firstOrNull { it.remoteId == p.fromId }
+        return SharePreview(Shares.classify(p.items, txs.getAll()),
+            Shares.classifyPayments(p.payments, sharing.getSettlements(), sender?.id), sender)
+    }
 
     /**
-     * Records the received items according to [choices] (one per item of [incoming]) and returns how many
-     * were recorded. [senderId] is the person who sent [p]; null adds them as a new person.
+     * Records a received share and returns how many entries were recorded: the expenses and settle-ups of
+     * [preview] according to [choices] and [paymentChoices] (one per entry), and the starting balance if
+     * [takeStarting]. [senderId] is the person who sent [p]; null adds them as a new person.
      */
-    suspend fun importShare(p: SharePayload, incoming: List<Incoming>, choices: List<ImportChoice>, senderId: Long?): Int {
+    suspend fun importShare(
+        p: SharePayload, preview: SharePreview, choices: List<ImportChoice>, paymentChoices: List<ImportChoice>,
+        takeStarting: Boolean, senderId: Long?,
+    ): Int {
         ensureSeeded()
         val uncategorized = uncategorizedId()
         return db.withTransaction {
@@ -345,7 +361,7 @@ class Repository(private val db: AppDatabase, private val settings: Settings) {
             } ?: sharing.insertPerson(Person(nickname = p.fromName, remoteId = p.fromId))
             val accountId = accounts.getAll().first().id
             var recorded = 0
-            for ((inc, choice) in incoming.zip(choices)) {
+            for ((inc, choice) in preview.items.zip(choices)) {
                 if (choice == ImportChoice.SKIP || inc.kind == IncomingKind.ALREADY_ADDED) continue
                 val item = inc.item
                 val base = when {
@@ -375,6 +391,25 @@ class Repository(private val db: AppDatabase, private val settings: Settings) {
                 sharing.insertSplits(item.people.mapIndexed { i, person ->
                     SplitPart(transactionId = id, personId = ids[i], basisPoints = person.basisPoints)
                 })
+                recorded++
+            }
+            for ((inc, choice) in preview.payments.zip(paymentChoices)) {
+                if (choice == ImportChoice.SKIP || inc.kind == IncomingKind.ALREADY_ADDED) continue
+                val pay = inc.payment
+                val base = when {
+                    inc.kind == IncomingKind.UPDATE -> inc.existing!!.copy(timestamp = pay.timestamp,
+                        amountCents = pay.amountCents, fromMe = !pay.fromSender, note = pay.note)
+                    inc.kind == IncomingKind.POSSIBLE_DUPLICATE && choice == ImportChoice.LINK -> inc.existing!!
+                    else -> Settlement(personId = sender, timestamp = pay.timestamp, amountCents = pay.amountCents,
+                        fromMe = !pay.fromSender, accountId = accountId, note = pay.note)
+                }
+                val s = base.copy(shareId = pay.shareId, shareVersion = pay.version)
+                if (s.id == 0L) sharing.insertSettlement(s) else sharing.updateSettlement(s)
+                recorded++
+            }
+            val starting = p.startingCents
+            if (takeStarting && starting != null) {
+                sharing.getPeople().first { it.id == sender }.let { sharing.updatePerson(it.copy(startingBalanceCents = -starting)) }
                 recorded++
             }
             recorded

@@ -7,7 +7,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Share
 import io.github.faolivieri.fedexpenses.data.SharePayload
@@ -118,7 +117,7 @@ fun SharingScreen(vm: MainViewModel, onOpenPerson: (Long) -> Unit, onReceive: ()
             TopAppBar(
                 title = { Text("Sharing") },
                 actions = {
-                    IconButton(onClick = { openFile.launch(arrayOf("*/*")) }) { Icon(Icons.Filled.FileOpen, "Open a shared file") }
+                    TextButton(onClick = { openFile.launch(arrayOf("*/*")) }) { Text("Import transaction") }
                 },
             )
         },
@@ -166,13 +165,19 @@ fun PersonScreen(vm: MainViewModel, personId: Long, onOpenTransaction: (Long) ->
     var editing by remember { mutableStateOf(false) }
     var settling by remember { mutableStateOf<Settlement?>(null) }
     var newSettlement by remember { mutableStateOf(false) }
-    /** Expenses selected for sharing (long-press to start). */
-    var selected by remember { mutableStateOf(setOf<Long>()) }
-    val expenseIds = entries.filterIsInstance<SharedEntry.Expense>().map { it.tx.id }
+    /** Entries selected for sharing (long-press to start), by [entryKey]. */
+    var selected by remember { mutableStateOf(setOf<String>()) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val withNickname = rememberNicknameGate(vm)
     BackHandler(enabled = selected.isNotEmpty()) { selected = emptySet() }
+
+    fun share(keys: Set<String>) {
+        val txIds = entries.filterIsInstance<SharedEntry.Expense>().filter { entryKey(it) in keys }.map { it.tx.id }
+        val settlementIds = entries.filterIsInstance<SharedEntry.Payment>().filter { entryKey(it) in keys }.map { it.settlement.id }
+        val starting = entries.any { it is SharedEntry.Starting && entryKey(it) in keys }
+        withNickname { vm.share(context, personId, txIds, settlementIds, starting); selected = emptySet() }
+    }
 
     Scaffold(
         topBar = {
@@ -181,11 +186,8 @@ fun PersonScreen(vm: MainViewModel, personId: Long, onOpenTransaction: (Long) ->
                     navigationIcon = { IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Filled.Close, "Cancel selection") } },
                     title = { Text("${selected.size} selected") },
                     actions = {
-                        IconButton(onClick = { selected = expenseIds.toSet() }) { Icon(Icons.Filled.SelectAll, "Select all") }
-                        IconButton(onClick = {
-                            val ids = selected.toList()
-                            withNickname { vm.share(context, personId, ids); selected = emptySet() }
-                        }) { Icon(Icons.Filled.Share, "Share with ${person.nickname}") }
+                        IconButton(onClick = { selected = entries.map(::entryKey).toSet() }) { Icon(Icons.Filled.SelectAll, "Select all") }
+                        IconButton(onClick = { share(selected) }) { Icon(Icons.Filled.Share, "Share with ${person.nickname}") }
                     },
                 )
             } else {
@@ -193,7 +195,7 @@ fun PersonScreen(vm: MainViewModel, personId: Long, onOpenTransaction: (Long) ->
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                     title = { Text(person.nickname, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     actions = {
-                        if (expenseIds.isNotEmpty()) IconButton(onClick = { withNickname { vm.share(context, personId, expenseIds) } }) {
+                        if (entries.isNotEmpty()) IconButton(onClick = { share(entries.map(::entryKey).toSet()) }) {
                             Icon(Icons.Filled.Share, "Share everything with ${person.nickname}")
                         }
                         IconButton(onClick = { editing = true }) { Icon(Icons.Filled.Edit, "Edit person") }
@@ -212,23 +214,18 @@ fun PersonScreen(vm: MainViewModel, personId: Long, onOpenTransaction: (Long) ->
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
             if (entries.isEmpty()) item { EmptyState("Nothing shared with ${person.nickname} yet") }
-            items(entries, key = { e ->
-                when (e) {
-                    is SharedEntry.Expense -> "t${e.tx.id}"
-                    is SharedEntry.Payment -> "s${e.settlement.id}"
-                    is SharedEntry.Starting -> "start"
-                }
-            }) { e ->
-                val txId = (e as? SharedEntry.Expense)?.tx?.id
-                fun toggle(id: Long) { selected = if (id in selected) selected - id else selected + id }
+            items(entries, key = ::entryKey) { e ->
+                val key = entryKey(e)
+                fun toggle() { selected = if (key in selected) selected - key else selected + key }
                 EntryRow(
-                    e, person, people, selected = txId != null && txId in selected,
-                    onLongClick = txId?.let { { toggle(it) } },
+                    e, person, people, selected = key in selected,
+                    onLongClick = ::toggle,
                     onClick = {
-                        when (e) {
-                            is SharedEntry.Expense -> if (selected.isNotEmpty()) toggle(e.tx.id) else onOpenTransaction(e.tx.id)
-                            is SharedEntry.Payment -> settling = e.settlement
-                            is SharedEntry.Starting -> editing = true
+                        when {
+                            selected.isNotEmpty() -> toggle()
+                            e is SharedEntry.Expense -> onOpenTransaction(e.tx.id)
+                            e is SharedEntry.Payment -> settling = e.settlement
+                            e is SharedEntry.Starting -> editing = true
                         }
                     },
                 )
@@ -266,6 +263,12 @@ fun PersonScreen(vm: MainViewModel, personId: Long, onOpenTransaction: (Long) ->
             onDelete = { vm.deleteSettlement(it); settling = null },
         )
     }
+}
+
+private fun entryKey(e: SharedEntry): String = when (e) {
+    is SharedEntry.Expense -> "t${e.tx.id}"
+    is SharedEntry.Payment -> "s${e.settlement.id}"
+    is SharedEntry.Starting -> "start"
 }
 
 @OptIn(ExperimentalFoundationApi::class)

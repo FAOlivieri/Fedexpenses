@@ -26,25 +26,34 @@ import java.time.LocalDate
 /** Sending shared expenses through the Android share sheet, and reading what other phones sent. */
 object ShareActions {
     private const val MAX_FILE_BYTES = 1 shl 20
+    const val MIME = "application/vnd.fedexpenses"
+    const val EXTENSION = ".fedexpenses"
 
     /** Writes [p] to a file and shares it. */
     fun sendFile(context: Context, p: SharePayload, recipient: String) {
         val dir = File(context.cacheDir, "shared").apply { mkdirs() }
-        val file = File(dir, "Fedexpenses ${fileSafe(p.fromName)} to ${fileSafe(recipient)} ${LocalDate.now()}.json")
+        val file = File(dir, "Fedexpenses ${fileSafe(p.fromName)} to ${fileSafe(recipient)} ${LocalDate.now()}$EXTENSION")
         file.writeText(Shares.toJson(p))
         val uri = FileProvider.getUriForFile(context, context.packageName + ".files", file)
-        val item = p.items.singleOrNull()
+        val item = p.items.singleOrNull()?.takeIf { p.payments.isEmpty() && p.startingCents == null }
         val text = if (item != null) {
             val what = item.seller?.trim()?.takeIf { it.isNotEmpty() } ?: item.note.trim().ifEmpty { "an expense" }
             "${p.fromName} shared an expense with you through the Fedexpenses app: $what, " +
                 "${Dates.short(item.timestamp.toLocalDate())}. The total was ${Money.format(item.totalCents)} and your " +
                 "part is ${Money.format(item.recipientCents)}. Open the attached file with Fedexpenses to add it."
         } else {
-            "${p.fromName} shared ${p.items.size} expenses with you through the Fedexpenses app " +
-                "(your part: ${Money.format(p.items.sumOf { it.recipientCents })}). " +
+            fun count(n: Int, what: String) = if (n == 1) "1 $what" else "$n ${what}s"
+            val parts = listOfNotNull(
+                count(p.items.size, "expense").takeIf { p.items.isNotEmpty() },
+                count(p.payments.size, "settle-up").takeIf { p.payments.isNotEmpty() },
+                "your starting balance".takeIf { p.startingCents != null },
+            )
+            val list = if (parts.size == 1) parts[0] else parts.dropLast(1).joinToString() + " and " + parts.last()
+            val yourPart = if (p.items.isEmpty()) "" else " (your part of the expenses: ${Money.format(p.items.sumOf { it.recipientCents })})"
+            "${p.fromName} shared $list with you through the Fedexpenses app$yourPart. " +
                 "Open the attached file with Fedexpenses to add them."
         }
-        val send = Intent(Intent.ACTION_SEND).setType("application/json")
+        val send = Intent(Intent.ACTION_SEND).setType(MIME)
             .putExtra(Intent.EXTRA_STREAM, uri).putExtra(Intent.EXTRA_TEXT, text)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         send.clipData = ClipData.newRawUri(file.name, uri)
@@ -78,6 +87,12 @@ object ShareActions {
     }
 
     private fun fileSafe(s: String) = s.replace(Regex("[^\\p{L}\\p{N} ._-]"), "").trim().ifEmpty { "someone" }
+}
+
+/** Serves share files with [ShareActions.MIME], so apps that ask for a file's type get the Fedexpenses one. */
+class ShareFileProvider : FileProvider() {
+    override fun getType(uri: Uri): String? =
+        if (uri.path?.endsWith(ShareActions.EXTENSION) == true) ShareActions.MIME else super.getType(uri)
 }
 
 /**

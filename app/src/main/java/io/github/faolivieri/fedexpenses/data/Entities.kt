@@ -114,6 +114,10 @@ data class Settlement(
     val fromMe: Boolean,
     val accountId: Long,
     val note: String = "",
+    /** Identifies a shared settle-up on every phone it was sent to; set when first shared or received. */
+    val shareId: String? = null,
+    /** Edit counter of a shared settle-up: a received copy with a higher version replaces the older one. */
+    @ColumnInfo(defaultValue = "0") val shareVersion: Int = 0,
 )
 
 enum class MatchType { EXACT, CONTAINS, REGEX }

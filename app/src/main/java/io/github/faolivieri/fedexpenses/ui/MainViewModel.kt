@@ -10,7 +10,7 @@ import io.github.faolivieri.fedexpenses.data.Account
 import io.github.faolivieri.fedexpenses.data.Category
 import io.github.faolivieri.fedexpenses.data.Frequency
 import io.github.faolivieri.fedexpenses.data.ImportChoice
-import io.github.faolivieri.fedexpenses.data.Incoming
+import io.github.faolivieri.fedexpenses.data.SharePreview
 import io.github.faolivieri.fedexpenses.data.SharePayload
 import io.github.faolivieri.fedexpenses.data.Person
 import io.github.faolivieri.fedexpenses.data.Recurrence
@@ -237,20 +237,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun saveTransactionNow(tx: Transaction, splits: List<SplitPart>?): Long = repo.saveTransaction(tx, splits)
 
-    /** Sends the expenses among [txIds] that are split with [personId], as a file. */
-    fun share(context: Context, personId: Long, txIds: List<Long>) = viewModelScope.launch {
-        val p = repo.buildShare(personId, txIds)
+    /** Sends [personId] a file with what [Repository.buildShare] selects. */
+    fun share(
+        context: Context, personId: Long, txIds: List<Long>, settlementIds: List<Long> = emptyList(),
+        includeStarting: Boolean = false,
+    ) = viewModelScope.launch {
+        val p = repo.buildShare(personId, txIds, settlementIds, includeStarting)
         val name = people.value.firstOrNull { it.id == personId }?.nickname.orEmpty()
-        if (p.items.isEmpty()) Toast.makeText(context, "None of these are split with $name", Toast.LENGTH_LONG).show()
+        if (p.isEmpty) Toast.makeText(context, "Nothing here is shared with $name", Toast.LENGTH_LONG).show()
         else ShareActions.sendFile(context, p, name)
     }
 
     fun applySplit(txIds: List<Long>, personIds: List<Long>, paidBy: Long?) =
         viewModelScope.launch { repo.applySplit(txIds, personIds, paidBy) }
 
-    suspend fun previewShare(p: SharePayload): List<Incoming> = repo.previewShare(p)
-    suspend fun senderOf(p: SharePayload): Person? = repo.senderOf(p)
-    suspend fun importShare(p: SharePayload, incoming: List<Incoming>, choices: List<ImportChoice>, senderId: Long?): Int =
-        repo.importShare(p, incoming, choices, senderId)
+    suspend fun previewShare(p: SharePayload): SharePreview = repo.previewShare(p)
+    suspend fun importShare(
+        p: SharePayload, preview: SharePreview, choices: List<ImportChoice>, paymentChoices: List<ImportChoice>,
+        takeStarting: Boolean, senderId: Long?,
+    ): Int = repo.importShare(p, preview, choices, paymentChoices, takeStarting, senderId)
     fun deleteSettlement(id: Long) = viewModelScope.launch { repo.deleteSettlement(id) }
 }

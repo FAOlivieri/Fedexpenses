@@ -589,8 +589,10 @@ private fun SplitSection(
             val list = split.map { (id, bp) -> SplitPart(transactionId = 0, personId = id.takeIf { i -> i != 0L }, basisPoints = bp) }
             Splits.parts(it, list, payer.takeIf { p -> p != 0L })
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Spacer(Modifier.weight(1f))
+            Text("Used", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center, modifier = Modifier.width(110.dp))
             Text("Paid", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center, modifier = Modifier.width(48.dp))
         }

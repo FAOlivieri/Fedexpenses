@@ -21,7 +21,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SplitPart::class,
         Settlement::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,7 +40,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
 
         /**
@@ -120,6 +120,14 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN shareId TEXT")
                 db.execSQL("ALTER TABLE transactions ADD COLUMN shareVersion INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_shareId` ON `transactions` (`shareId`)")
+            }
+        }
+
+        /** v7: settle-ups remember their identity and version when shared between phones. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE settlements ADD COLUMN shareId TEXT")
+                db.execSQL("ALTER TABLE settlements ADD COLUMN shareVersion INTEGER NOT NULL DEFAULT 0")
             }
         }
 

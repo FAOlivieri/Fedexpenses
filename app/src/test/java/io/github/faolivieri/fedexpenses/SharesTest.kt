@@ -3,6 +3,8 @@ package io.github.faolivieri.fedexpenses
 import io.github.faolivieri.fedexpenses.data.IncomingKind
 import io.github.faolivieri.fedexpenses.data.ShareItem
 import io.github.faolivieri.fedexpenses.data.ShareParticipant
+import io.github.faolivieri.fedexpenses.data.SharePayment
+import io.github.faolivieri.fedexpenses.data.Settlement
 import io.github.faolivieri.fedexpenses.data.SharePayload
 import io.github.faolivieri.fedexpenses.data.Shares
 import io.github.faolivieri.fedexpenses.data.Transaction
@@ -25,7 +27,18 @@ class SharesTest {
         to = 1, paidBy = 0,
     )
 
-    private val payload = SharePayload("fede-id", "Federico", listOf(item(), item(id = "s2", ver = 3, total = 1250)))
+    private val payload = SharePayload(
+        "fede-id", "Federico", listOf(item(), item(id = "s2", ver = 3, total = 1250)),
+        payments = listOf(SharePayment("p1", 2, 101 * day, 4000, fromSender = false, note = "Bank transfer")),
+        startingCents = -1500,
+    )
+
+    private fun pay(id: String = "p1", ver: Int = 0, ts: Long = 100 * day, cents: Long = 4000, fromSender: Boolean = false) =
+        SharePayment(id, ver, ts, cents, fromSender, "")
+
+    private fun settlement(id: Long, person: Long, cents: Long, fromMe: Boolean, ts: Long, shareId: String? = null, ver: Int = 0) =
+        Settlement(id = id, personId = person, timestamp = ts, amountCents = cents, fromMe = fromMe, accountId = 1,
+            shareId = shareId, shareVersion = ver)
 
     private fun tx(id: Long, cents: Long, ts: Long, shareId: String? = null, ver: Int = 0) = Transaction(
         id = id, timestamp = ts, amountCents = cents, type = TxType.EXPENSE, categoryId = 1, accountId = 1,
@@ -34,6 +47,33 @@ class SharesTest {
 
     @Test fun jsonRoundTrips() {
         assertEquals(payload, Shares.fromJson(Shares.toJson(payload)))
+    }
+
+    @Test fun sharesWithoutSettleUpsOrStartingBalanceStillRead() {
+        val plain = SharePayload("fede-id", "Federico", listOf(item()))
+        assertEquals(plain, Shares.fromJson(Shares.toJson(plain)))
+    }
+
+    @Test fun classifiesSettleUpsFromTheRecipientsSide() {
+        val sender = 7L
+        val existing = listOf(
+            settlement(1, sender, 9999, fromMe = true, ts = 100 * day, shareId = "p1", ver = 0),
+            // The sender paid the recipient 40.00: on this phone that's "they paid me" (fromMe = false).
+            settlement(2, sender, 4000, fromMe = false, ts = 101 * day),
+            settlement(3, sender, 2500, fromMe = true, ts = 100 * day),
+        )
+        val kinds = Shares.classifyPayments(listOf(
+            pay("p1", ver = 0),
+            pay("p1", ver = 1),
+            pay("p2", cents = 4000, fromSender = true),
+            pay("p3", cents = 2500, fromSender = true),
+            pay("p4", cents = 4000, fromSender = true, ts = 105 * day),
+        ), existing, sender, dayOf).map { it.kind }
+        assertEquals(
+            listOf(IncomingKind.ALREADY_ADDED, IncomingKind.UPDATE, IncomingKind.POSSIBLE_DUPLICATE, IncomingKind.NEW, IncomingKind.NEW),
+            kinds,
+        )
+        assertEquals(IncomingKind.NEW, Shares.classifyPayments(listOf(pay("p2", fromSender = true)), existing, null, dayOf).single().kind)
     }
 
     @Test fun otherFilesAreRejected() {
