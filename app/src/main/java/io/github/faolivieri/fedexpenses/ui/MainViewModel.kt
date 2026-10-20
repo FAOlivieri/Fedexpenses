@@ -1,12 +1,17 @@
 package io.github.faolivieri.fedexpenses.ui
 
 import android.app.Application
+import android.content.Context
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.faolivieri.fedexpenses.container
 import io.github.faolivieri.fedexpenses.data.Account
 import io.github.faolivieri.fedexpenses.data.Category
 import io.github.faolivieri.fedexpenses.data.Frequency
+import io.github.faolivieri.fedexpenses.data.ImportChoice
+import io.github.faolivieri.fedexpenses.data.Incoming
+import io.github.faolivieri.fedexpenses.data.SharePayload
 import io.github.faolivieri.fedexpenses.data.Person
 import io.github.faolivieri.fedexpenses.data.Recurrence
 import io.github.faolivieri.fedexpenses.data.SellerRule
@@ -89,6 +94,7 @@ data class ReportData(val labels: List<String>, val series: List<ReportSeries>)
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = app.container.repo
+    private val settings = app.container.settings
 
     init {
         viewModelScope.launch { repo.ensureSeeded() }
@@ -220,5 +226,31 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun savePerson(p: Person): Long = repo.savePerson(p)
     suspend fun deletePerson(id: Long): Boolean = repo.deletePerson(id)
     fun saveSettlement(s: Settlement) = viewModelScope.launch { repo.saveSettlement(s) }
+
+    // --- Sharing between phones ----------------------------------------------------------------
+
+    fun myNickname(): String = settings.myNickname
+    fun setMyNickname(name: String) { settings.myNickname = name }
+
+    /** A received share waiting for review. */
+    val incomingShare = app.container.incomingShare
+
+    suspend fun saveTransactionNow(tx: Transaction, splits: List<SplitPart>?): Long = repo.saveTransaction(tx, splits)
+
+    /** Sends the expenses among [txIds] that are split with [personId], as a file. */
+    fun share(context: Context, personId: Long, txIds: List<Long>) = viewModelScope.launch {
+        val p = repo.buildShare(personId, txIds)
+        val name = people.value.firstOrNull { it.id == personId }?.nickname.orEmpty()
+        if (p.items.isEmpty()) Toast.makeText(context, "None of these are split with $name", Toast.LENGTH_LONG).show()
+        else ShareActions.sendFile(context, p, name)
+    }
+
+    fun applySplit(txIds: List<Long>, personIds: List<Long>, paidBy: Long?) =
+        viewModelScope.launch { repo.applySplit(txIds, personIds, paidBy) }
+
+    suspend fun previewShare(p: SharePayload): List<Incoming> = repo.previewShare(p)
+    suspend fun senderOf(p: SharePayload): Person? = repo.senderOf(p)
+    suspend fun importShare(p: SharePayload, incoming: List<Incoming>, choices: List<ImportChoice>, senderId: Long?): Int =
+        repo.importShare(p, incoming, choices, senderId)
     fun deleteSettlement(id: Long) = viewModelScope.launch { repo.deleteSettlement(id) }
 }

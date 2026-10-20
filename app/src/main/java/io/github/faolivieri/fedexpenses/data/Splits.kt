@@ -28,14 +28,21 @@ object Splits {
     fun equal(n: Int): List<Int> = List(n) { i -> WHOLE / n + if (i < WHOLE % n) 1 else 0 }
 
     /**
-     * Each participant's part of [total] cents, rounded to the nearest cent and keyed by person id (null is
-     * you). The parts add up to [total]: the rounding difference goes to [paidBy], or to the first participant
-     * if [paidBy] has no part.
+     * Each participant's part of [total] cents, keyed by person id (null is you). The parts add up to [total].
+     * Uneven parts are rounded to the nearest cent and the rounding difference goes to [paidBy], or to the
+     * first participant if [paidBy] has no part.
      */
     fun parts(total: Long, splits: List<SplitPart>, paidBy: Long?): Map<Long?, Long> {
         if (splits.isEmpty()) return emptyMap()
+        val key = if (splits.any { it.personId == paidBy }) paidBy else splits.first().personId
+        // An equal split divides the amount itself; leftover cents go one each, starting with the payer.
+        if (splits.map { it.basisPoints }.sorted() == equal(splits.size).sorted()) {
+            val base = total / splits.size
+            val extra = total % splits.size
+            return splits.map { it.personId }.sortedBy { it != key }
+                .withIndex().associate { (i, id) -> id to base + if (i < extra) 1 else 0 }
+        }
         val parts = splits.associate { it.personId to (total * it.basisPoints + WHOLE / 2) / WHOLE }.toMutableMap()
-        val key = if (paidBy in parts) paidBy else splits.first().personId
         parts[key] = parts.getValue(key) + total - parts.values.sum()
         return parts
     }

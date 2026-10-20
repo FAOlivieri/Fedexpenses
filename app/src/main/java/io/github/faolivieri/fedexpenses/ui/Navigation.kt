@@ -41,6 +41,7 @@ import io.github.faolivieri.fedexpenses.ui.screens.CategoriesScreen
 import io.github.faolivieri.fedexpenses.ui.screens.EditTransactionScreen
 import io.github.faolivieri.fedexpenses.ui.screens.OverviewScreen
 import io.github.faolivieri.fedexpenses.ui.screens.PersonScreen
+import io.github.faolivieri.fedexpenses.ui.screens.ReceiveScreen
 import io.github.faolivieri.fedexpenses.ui.screens.RecurringScreen
 import io.github.faolivieri.fedexpenses.ui.screens.ReportsScreen
 import io.github.faolivieri.fedexpenses.ui.screens.RuleEditScreen
@@ -66,6 +67,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val RECURRING = "recurring"
     const val ACCOUNTS = "accounts"
+    const val RECEIVE = "receive"
     fun person(id: Long) = "person/$id"
 }
 
@@ -143,7 +145,10 @@ fun ExpensesNavHost(pendingRoute: StateFlow<String?>, onRouteConsumed: () -> Uni
                 SellerRuleEditScreen(vm, ruleId = entry.arguments?.getLong("id") ?: 0L,
                     initialSeller = entry.arguments?.getString("seller").orEmpty(), onDone = { nav.popBackStack() })
             }
-            composable(Tab.Sharing.route) { SharingScreen(vm, onOpenPerson = { nav.navigate(Routes.person(it)) }) }
+            composable(Tab.Sharing.route) {
+                SharingScreen(vm, onOpenPerson = { nav.navigate(Routes.person(it)) }, onReceive = { nav.navigate(Routes.RECEIVE) })
+            }
+            composable(Routes.RECEIVE) { ReceiveScreen(vm, onDone = { nav.popBackStack() }) }
             composable("person/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
                 PersonScreen(vm, personId = entry.arguments?.getLong("id") ?: 0L,
                     onOpenTransaction = { nav.navigate(Routes.edit(it)) }, onBack = { nav.popBackStack() })

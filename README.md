@@ -20,7 +20,7 @@ Everything stays on your phone: the app has **no internet permission**. Backups 
 - **Category learning**: seller rules remember which category each shop belongs to. Unknown sellers get a notification with quick category buttons.
 - **Manual entries** for expenses and income, with date, category, account, seller and note.
 - **Repeating payments**: weekly, monthly or yearly, created automatically at the start of each day they're due.
-- **Split expenses** with other people and keep a running balance with each of them.
+- **Split expenses** with other people, keep a running balance with each of them, and send shared expenses to their app through any messenger.
 - **Overview** of income, expenses and balance per month or year, with a breakdown by category.
 - **Transactions** list with search and filters; expenses in red, income in green.
 - **Reports**: plot any categories, or all expenses and all income, over any range of months or years.
@@ -105,6 +105,20 @@ The **Sharing** tab lists the people you split expenses with and what each of yo
 - **Settle up**: open a person and tap **Settle up** to record money paid between you, for the full balance or any part of it, on any date. It moves the balance and the chosen account, without counting as spending or income.
 - Repeating payments can't be split; split each occurrence instead.
 - Tap an expense in a person's history to edit it, or a settle-up to change or delete it.
+
+### Sending shared expenses to other people
+
+Shared expenses travel as small files through any messaging app or email; Fedexpenses itself still never goes online and no website is involved. The first time you share, the app asks for **your name** (also in **Settings → General**).
+
+- **One expense**: in its editor, tap **Save and share with …** and send the file to that person.
+- **Several expenses**: long-press transactions in the **Transactions** tab (or in a person's history) to select them, then tap **Share**. They're sent together in one file, e.g. at the end of a trip. A person's screen also has a **Share** button that sends everything you split with them.
+- **Splitting several at once**: select transactions and tap the **people** icon to split them all equally and set who paid.
+- **Receiving**: tap the file in the chat and open it with Fedexpenses, or save it and tap **Open file** at the top of the **Sharing** tab. A review screen shows each expense and your part:
+  - The first time someone shares with you, pick them from your people (or add them as new) so their balance stays together.
+  - **Already added** expenses are skipped, and ones the sender changed since replace your copy.
+  - **Possible duplicates** (an expense of yours with the same amount within a day, e.g. one your bank notification already recorded) can be split instead of added twice.
+- Received expenses get a category from your seller rules (or *Uncategorized*) and your first account; change them like any other.
+- Settle-ups and deletions aren't sent: record those on both phones.
 
 ### Watching other apps (e.g. your bank)
 

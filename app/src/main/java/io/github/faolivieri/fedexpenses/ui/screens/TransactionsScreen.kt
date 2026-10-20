@@ -3,6 +3,14 @@ package io.github.faolivieri.fedexpenses.ui.screens
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Share
+import io.github.faolivieri.fedexpenses.data.Person
+import io.github.faolivieri.fedexpenses.ui.rememberNicknameGate
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -91,10 +99,40 @@ fun TransactionsScreen(vm: MainViewModel, onOpen: (Long) -> Unit, onAdd: (TxType
     var searching by rememberSaveable { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(false) }
     val money = LocalMoneyColors.current
+    val people by vm.people.collectAsStateWithLifecycle()
+    /** Transactions selected with a long-press, for splitting or sharing several at once. */
+    var selected by remember { mutableStateOf(setOf<Long>()) }
+    var splitting by remember { mutableStateOf(false) }
+    var choosingPerson by remember { mutableStateOf<List<Person>?>(null) }
+    val context = LocalContext.current
+    val withNickname = rememberNicknameGate(vm)
+    BackHandler(enabled = selected.isNotEmpty()) { selected = emptySet() }
+
+    fun share() {
+        val involved = list.orEmpty().filter { it.tx.id in selected }.flatMap { d -> d.split.mapNotNull { it.personId } }.toSet()
+        val candidates = people.filter { it.id in involved }
+        when (candidates.size) {
+            0 -> Toast.makeText(context, "Split them with someone first", Toast.LENGTH_LONG).show()
+            1 -> withNickname { vm.share(context, candidates.single().id, selected.toList()); selected = emptySet() }
+            else -> choosingPerson = candidates
+        }
+    }
 
     Scaffold(
         topBar = {
-            if (searching) {
+            if (selected.isNotEmpty()) {
+                TopAppBar(
+                    navigationIcon = { IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Filled.Close, "Cancel selection") } },
+                    title = { Text("${selected.size} selected") },
+                    actions = {
+                        IconButton(onClick = { selected = list.orEmpty().map { it.tx.id }.toSet() }) {
+                            Icon(Icons.Filled.SelectAll, "Select all")
+                        }
+                        IconButton(onClick = { splitting = true }) { Icon(Icons.Filled.Group, "Split") }
+                        IconButton(onClick = ::share) { Icon(Icons.Filled.Share, "Share") }
+                    },
+                )
+            } else if (searching) {
                 TopAppBar(
                     navigationIcon = {
                         IconButton(onClick = { searching = false; vm.filter.value = filter.copy(query = "") }) {
@@ -165,10 +203,31 @@ fun TransactionsScreen(vm: MainViewModel, onOpen: (Long) -> Unit, onAdd: (TxType
                     }
                 }
                 items(txs, key = { it.tx.id }, contentType = { "tx" }) { d ->
-                    TransactionRow(d, showAccount = accounts.size > 1) { onOpen(d.tx.id) }
+                    TransactionRow(
+                        d, showAccount = accounts.size > 1, selected = d.tx.id in selected,
+                        onLongClick = { selected = if (d.tx.id in selected) selected - d.tx.id else selected + d.tx.id },
+                    ) {
+                        if (selected.isEmpty()) onOpen(d.tx.id)
+                        else selected = if (d.tx.id in selected) selected - d.tx.id else selected + d.tx.id
+                    }
                 }
                 item(key = "div$day", contentType = "divider") { HorizontalDivider(Modifier.padding(start = 68.dp), color = MaterialTheme.colorScheme.outlineVariant) }
             }
+        }
+    }
+
+    if (splitting) {
+        SplitManyDialog(
+            count = list.orEmpty().count { it.tx.id in selected && it.tx.type == TxType.EXPENSE }, people = people,
+            onDismiss = { splitting = false },
+            onApply = { ids, payer -> vm.applySplit(selected.toList(), ids, payer); splitting = false },
+        )
+    }
+
+    choosingPerson?.let { candidates ->
+        ChoosePersonDialog(candidates, onDismiss = { choosingPerson = null }) { p ->
+            choosingPerson = null
+            withNickname { vm.share(context, p.id, selected.toList()); selected = emptySet() }
         }
     }
 
@@ -179,10 +238,16 @@ fun TransactionsScreen(vm: MainViewModel, onOpen: (Long) -> Unit, onAdd: (TxType
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TransactionRow(d: TxDetails, showAccount: Boolean, onClick: () -> Unit) {
+fun TransactionRow(
+    d: TxDetails, showAccount: Boolean, selected: Boolean = false, onLongClick: (() -> Unit)? = null, onClick: () -> Unit,
+) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth()
+            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CategoryBadge(d.category)

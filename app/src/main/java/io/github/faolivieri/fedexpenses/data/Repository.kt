@@ -8,10 +8,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
+import java.util.UUID
 
 data class ImportSummary(val added: Int, val skippedDuplicates: Int, val newCategories: Int, val errors: List<String>)
 
-class Repository(private val db: AppDatabase) {
+class Repository(private val db: AppDatabase, private val settings: Settings) {
     private val categories = db.categories()
     private val accounts = db.accounts()
     private val txs = db.transactions()
@@ -296,6 +297,114 @@ class Repository(private val db: AppDatabase) {
 
     suspend fun deleteSettlement(id: Long) = sharing.deleteSettlement(id)
 
+    // --- Sharing between phones ----------------------------------------------------------------
+
+    /**
+     * The expenses among [txIds] that are split with [personId], addressed to them. Each gets a share id
+     * the first time it is shared.
+     */
+    suspend fun buildShare(personId: Long, txIds: List<Long>): SharePayload = db.withTransaction {
+        val people = sharing.getPeople().associateBy { it.id }
+        val items = txIds.mapNotNull { id ->
+            var tx = txs.get(id) ?: return@mapNotNull null
+            val parts = sharing.splitsFor(id).sortedBy { it.personId != null }
+            val to = parts.indexOfFirst { it.personId == personId }
+            if (to < 0) return@mapNotNull null
+            if (tx.shareId == null) tx = tx.copy(shareId = UUID.randomUUID().toString()).also { txs.update(it) }
+            ShareItem(
+                shareId = tx.shareId!!, version = tx.shareVersion, timestamp = tx.timestamp,
+                totalCents = tx.amountCents, seller = tx.merchant, note = tx.note,
+                people = parts.map { p ->
+                    val person = p.personId?.let { people[it] }
+                    if (p.personId == null) ShareParticipant(settings.myId, settings.myNickname, p.basisPoints)
+                    else ShareParticipant(person?.remoteId, person?.nickname.orEmpty(), p.basisPoints)
+                },
+                to = to, paidBy = parts.indexOfFirst { it.personId == tx.paidBy }.coerceAtLeast(0),
+            )
+        }
+        SharePayload(settings.myId, settings.myNickname, items)
+    }
+
+    suspend fun previewShare(p: SharePayload): List<Incoming> = Shares.classify(p.items, txs.getAll())
+
+    /** The person whose phone sent [p], if they have sent you something before. */
+    suspend fun senderOf(p: SharePayload): Person? = sharing.getPeople().firstOrNull { it.remoteId == p.fromId }
+
+    /**
+     * Records the received items according to [choices] (one per item of [incoming]) and returns how many
+     * were recorded. [senderId] is the person who sent [p]; null adds them as a new person.
+     */
+    suspend fun importShare(p: SharePayload, incoming: List<Incoming>, choices: List<ImportChoice>, senderId: Long?): Int {
+        ensureSeeded()
+        val uncategorized = uncategorizedId()
+        return db.withTransaction {
+            val sender = senderId?.let { id ->
+                sharing.getPeople().first { it.id == id }.also {
+                    if (it.remoteId != p.fromId) sharing.updatePerson(it.copy(remoteId = p.fromId))
+                }.id
+            } ?: sharing.insertPerson(Person(nickname = p.fromName, remoteId = p.fromId))
+            val accountId = accounts.getAll().first().id
+            var recorded = 0
+            for ((inc, choice) in incoming.zip(choices)) {
+                if (choice == ImportChoice.SKIP || inc.kind == IncomingKind.ALREADY_ADDED) continue
+                val item = inc.item
+                val base = when {
+                    inc.kind == IncomingKind.UPDATE -> inc.existing!!.copy(timestamp = item.timestamp,
+                        amountCents = item.totalCents, merchant = item.seller, note = item.note)
+                    inc.kind == IncomingKind.POSSIBLE_DUPLICATE && choice == ImportChoice.LINK -> inc.existing!!
+                    else -> {
+                        val rule = item.seller?.let { SellerMatcher.firstMatch(sellerRules.getAll(), it) }
+                        Transaction(
+                            timestamp = item.timestamp, amountCents = item.totalCents, type = TxType.EXPENSE,
+                            categoryId = rule?.categoryId?.let { categories.get(it)?.id } ?: uncategorized,
+                            accountId = accountId, note = item.note.ifBlank { rule?.note.orEmpty() },
+                            merchant = item.seller, source = TxSource.SHARED,
+                        )
+                    }
+                }
+                val ids = item.people.mapIndexed { i, person ->
+                    when {
+                        i == item.to -> null
+                        person.id == p.fromId -> sender
+                        else -> otherParticipant(person)
+                    }
+                }
+                val tx = base.copy(paidBy = ids[item.paidBy], shareId = item.shareId, shareVersion = item.version)
+                val id = if (tx.id == 0L) txs.insert(tx) else tx.also { txs.update(it) }.id
+                sharing.deleteSplitsFor(id)
+                sharing.insertSplits(item.people.mapIndexed { i, person ->
+                    SplitPart(transactionId = id, personId = ids[i], basisPoints = person.basisPoints)
+                })
+                recorded++
+            }
+            recorded
+        }
+    }
+
+    /** A participant other than you and the sender: matched by sharing id, then by nickname, else added. */
+    private suspend fun otherParticipant(p: ShareParticipant): Long {
+        val people = sharing.getPeople()
+        p.id?.let { id -> people.firstOrNull { it.remoteId == id }?.let { return it.id } }
+        people.firstOrNull { it.remoteId == null && it.nickname.equals(p.name, ignoreCase = true) }?.let { return it.id }
+        return sharing.insertPerson(Person(nickname = p.name.ifBlank { "Someone" }, remoteId = p.id))
+    }
+
+    /** Splits each expense of [txIds] equally between you and [personIds]; [paidBy] null means you paid. */
+    suspend fun applySplit(txIds: List<Long>, personIds: List<Long>, paidBy: Long?) = db.withTransaction {
+        val parts = Splits.equal(personIds.size + 1)
+        for (id in txIds) {
+            val tx = txs.get(id)?.takeIf { it.type == TxType.EXPENSE } ?: continue
+            txs.update(tx.copy(paidBy = paidBy.takeIf { personIds.isNotEmpty() },
+                shareVersion = if (tx.shareId != null) tx.shareVersion + 1 else tx.shareVersion))
+            sharing.deleteSplitsFor(id)
+            if (personIds.isNotEmpty()) {
+                sharing.insertSplits((listOf<Long?>(null) + personIds).zip(parts) { p, bp ->
+                    SplitPart(transactionId = id, personId = p, basisPoints = bp)
+                })
+            }
+        }
+    }
+
     // --- Import / export ---------------------------------------------------------------------
 
     suspend fun importCsv(content: String): ImportSummary {
@@ -362,7 +471,7 @@ class Repository(private val db: AppDatabase) {
 
     suspend fun exportBackup(): String = Backup.toJson(
         BackupData(categories.getAll(), accounts.getAll(), txs.getAll(), sellerRules.getAll(), rules.getAll(), recurrences.getAll(),
-            sharing.getPeople(), sharing.getSplits(), sharing.getSettlements())
+            sharing.getPeople(), sharing.getSplits(), sharing.getSettlements(), settings.myId, settings.myNickname)
     )
 
     /** Replaces all data with the backup's contents. */
@@ -384,6 +493,8 @@ class Repository(private val db: AppDatabase) {
             b.insertRules(data.rules)
             notificationLog.unlinkAll()
         }
+        data.myId?.let(settings::restoreMyId)
+        data.myNickname?.takeIf { it.isNotBlank() }?.let { settings.myNickname = it }
         uncategorizedIdCache = 0L
         seeded = false
         ensureSeeded()

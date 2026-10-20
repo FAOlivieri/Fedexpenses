@@ -39,6 +39,13 @@ class SplitsTest {
         assertEquals(333L, paidByAna[null])
     }
 
+    @Test fun equalSplitsDivideTheAmountItself() {
+        val s = split(1, null to 3334, ana to 3333, marko to 3333)
+        assertEquals(mapOf<Long?, Long>(null to 10000L, ana to 10000L, marko to 10000L), Splits.parts(30000, s, ana))
+        // 12.50 three ways: the payer and the next participant get the two leftover cents.
+        assertEquals(mapOf<Long?, Long>(ana to 417L, null to 417L, marko to 416L), Splits.parts(1250, s, ana))
+    }
+
     @Test fun myShareIsTheWholeAmountUnlessSplit() {
         assertEquals(6000L, Splits.mine(tx(1, 6000), emptyList()))
         assertEquals(2000L, Splits.mine(tx(1, 6000), split(1, null to 3334, ana to 3333, marko to 3333)))

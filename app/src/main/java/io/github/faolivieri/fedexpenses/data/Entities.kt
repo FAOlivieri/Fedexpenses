@@ -1,5 +1,6 @@
 package io.github.faolivieri.fedexpenses.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -7,7 +8,7 @@ import androidx.room.PrimaryKey
 
 enum class TxType { EXPENSE, INCOME }
 
-enum class TxSource { MANUAL, NOTIFICATION, IMPORT, RECURRING }
+enum class TxSource { MANUAL, NOTIFICATION, IMPORT, RECURRING, SHARED }
 
 @Entity(tableName = "categories", indices = [Index("name")])
 data class Category(
@@ -36,7 +37,7 @@ data class Account(
         ForeignKey(entity = Category::class, parentColumns = ["id"], childColumns = ["categoryId"]),
         ForeignKey(entity = Account::class, parentColumns = ["id"], childColumns = ["accountId"]),
     ],
-    indices = [Index("timestamp"), Index("categoryId"), Index("accountId"), Index("recurrenceId")],
+    indices = [Index("timestamp"), Index("categoryId"), Index("accountId"), Index("recurrenceId"), Index("shareId")],
 )
 data class Transaction(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -55,6 +56,10 @@ data class Transaction(
     val recurrenceId: Long? = null,
     /** The [Person] who paid a split expense; null when you paid. */
     val paidBy: Long? = null,
+    /** Identifies a shared expense on every phone it was sent to; set when first shared or received. */
+    val shareId: String? = null,
+    /** Edit counter of a shared expense: a received copy with a higher version replaces the older one. */
+    @ColumnInfo(defaultValue = "0") val shareVersion: Int = 0,
 ) {
     val signedCents: Long get() = if (type == TxType.EXPENSE) -amountCents else amountCents
 }

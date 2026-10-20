@@ -256,6 +256,13 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onEditRule: (Long)
                     label = { Text("Currency symbol") }, singleLine = true,
                     modifier = Modifier.padding(horizontal = 16.dp).width(160.dp),
                 )
+                var nickname by remember(s.nickname) { mutableStateOf(s.nickname) }
+                OutlinedTextField(
+                    value = nickname,
+                    onValueChange = { nickname = it; vm.setNickname(it.trim()) },
+                    label = { Text("Your name when sharing") }, singleLine = true,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp).fillMaxWidth(),
+                )
 
                 SectionTitle("Color palette")
                 PaletteChooser(

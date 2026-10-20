@@ -41,7 +41,10 @@ import androidx.compose.material3.InputChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.icons.filled.Share
+import io.github.faolivieri.fedexpenses.ui.rememberNicknameGate
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -144,6 +147,7 @@ fun EditTransactionScreen(
     /** Who paid: a person id, or 0 for you. */
     var payer by rememberSaveable { mutableLongStateOf(0L) }
     var newPerson by remember { mutableStateOf(false) }
+    val withNickname = rememberNicknameGate(vm)
     val context = LocalContext.current
 
     LaunchedEffect(txId) {
@@ -178,7 +182,8 @@ fun EditTransactionScreen(
     val splitValid = !splitShown || split.isEmpty() || split.sumOf { it.second } == Splits.WHOLE
     val canSave = cents != null && cents > 0 && categoryId != 0L && accountId != 0L && splitValid
 
-    fun save() {
+    /** Saves; with [shareWith], then shares the saved expense with that person. */
+    fun save(shareWith: Long? = null) {
         triedSave = true
         if (!canSave || (txId != 0L && original == null)) return
         val day = LocalDate.parse(date)
@@ -196,11 +201,20 @@ fun EditTransactionScreen(
             .copy(timestamp = day.toMillis() + time, amountCents = cents!!, type = type,
                 categoryId = categoryId, accountId = accountId, note = note.trim(),
                 merchant = seller.trim().ifEmpty { null },
-                paidBy = if (splits == null) base?.paidBy else payer.takeIf { it != 0L && splits.isNotEmpty() })
+                paidBy = if (splits == null) base?.paidBy else payer.takeIf { it != 0L && splits.isNotEmpty() },
+                shareVersion = base?.let { if (it.shareId != null) it.shareVersion + 1 else it.shareVersion } ?: 0)
         val r = recurrence
         val f = frequency
         val originalDay = base?.timestamp?.toLocalDate()
         when {
+            r == null && f == null && shareWith != null -> {
+                scope.launch {
+                    val id = vm.saveTransactionNow(tx, splits)
+                    vm.share(context, shareWith, listOf(id))
+                    onDone()
+                }
+                return
+            }
             r == null && f == null -> vm.saveTransaction(tx, splits)
             r == null -> {
                 vm.startRecurring(tx, f!!, endDay)
@@ -237,7 +251,7 @@ fun EditTransactionScreen(
             )
         },
         bottomBar = {
-            Button(onClick = ::save, enabled = loaded,
+            Button(onClick = { save() }, enabled = loaded,
                 modifier = Modifier.fillMaxWidth().imePadding().padding(16.dp).height(52.dp)) {
                 Text("Save")
             }
@@ -320,6 +334,16 @@ fun EditTransactionScreen(
                     onPayer = { payer = it },
                     onNewPerson = { newPerson = true },
                 )
+                if (recurrence == null) {
+                    split.filter { it.first != 0L }.forEach { (id, _) ->
+                        val name = people.firstOrNull { it.id == id }?.nickname.orEmpty()
+                        OutlinedButton(onClick = { withNickname { save(shareWith = id) } }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.Share, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Save and share with $name", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
             }
 
             Text("Account", style = MaterialTheme.typography.titleSmall)

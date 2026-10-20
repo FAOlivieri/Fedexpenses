@@ -27,6 +27,7 @@ import kotlinx.coroutines.withContext
 
 data class SettingsState(
     val currency: String,
+    val nickname: String,
     val backupUri: String?,
     val backupName: String?,
     val lastBackupAt: Long,
@@ -54,6 +55,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<SettingsState?> = settings.changes().map {
         SettingsState(
             currency = settings.currencySymbol,
+            nickname = settings.myNickname,
             backupUri = settings.backupUri,
             backupName = settings.backupUri?.let { displayName(Uri.parse(it)) },
             lastBackupAt = settings.lastBackupAt,
@@ -158,6 +160,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setBackgroundColor(argb: Int) {
         settings.themeBackgroundColor = argb
         settings.themeBackground = Backgrounds.CUSTOM
+    }
+
+    fun setNickname(name: String) {
+        settings.myNickname = name
     }
 
     fun setCurrency(symbol: String) {

@@ -14,16 +14,20 @@ data class BackupData(
     val people: List<Person> = emptyList(),
     val splits: List<SplitPart> = emptyList(),
     val settlements: List<Settlement> = emptyList(),
+    /** This phone's sharing identity ([Settings.myId], [Settings.myNickname]). */
+    val myId: String? = null,
+    val myNickname: String? = null,
 )
 
 object Backup {
     const val FORMAT = "expenses-backup"
-    const val VERSION = 5
+    const val VERSION = 6
 
     fun toJson(d: BackupData): String = JSONObject().apply {
         put("format", FORMAT)
         put("version", VERSION)
         put("createdAt", System.currentTimeMillis())
+        d.myId?.let { put("me", JSONObject().put("id", it).put("nickname", d.myNickname.orEmpty())) }
         put("categories", JSONArray(d.categories.map {
             JSONObject().put("id", it.id).put("name", it.name).put("type", it.type.name)
                 .put("color", it.color).put("icon", it.icon).put("isSystem", it.isSystem)
@@ -36,6 +40,7 @@ object Backup {
                 .put("type", it.type.name).put("categoryId", it.categoryId).put("accountId", it.accountId)
                 .put("note", it.note).put("merchant", it.merchant ?: JSONObject.NULL).put("source", it.source.name)
                 .put("recurrenceId", it.recurrenceId ?: JSONObject.NULL).put("paidBy", it.paidBy ?: JSONObject.NULL)
+                .put("shareId", it.shareId ?: JSONObject.NULL).put("shareVersion", it.shareVersion)
         }))
         put("people", JSONArray(d.people.map {
             JSONObject().put("id", it.id).put("nickname", it.nickname).put("remoteId", it.remoteId ?: JSONObject.NULL)
@@ -73,7 +78,9 @@ object Backup {
     fun fromJson(s: String): BackupData {
         val o = JSONObject(s)
         require(o.optString("format") == FORMAT) { "Not a Fedexpenses backup file" }
+        val me = o.optJSONObject("me")
         return BackupData(
+            myId = me?.getString("id"), myNickname = me?.optString("nickname"),
             categories = o.getJSONArray("categories").objects().map {
                 Category(it.getLong("id"), it.getString("name"), TxType.valueOf(it.getString("type")),
                     it.getInt("color"), it.getString("icon"), it.optBoolean("isSystem"))
@@ -95,6 +102,8 @@ object Backup {
                     source = TxSource.valueOf(it.optString("source", TxSource.MANUAL.name)),
                     recurrenceId = if (it.isNull("recurrenceId")) null else it.getLong("recurrenceId"),
                     paidBy = if (!it.has("paidBy") || it.isNull("paidBy")) null else it.getLong("paidBy"),
+                    shareId = if (!it.has("shareId") || it.isNull("shareId")) null else it.getString("shareId"),
+                    shareVersion = it.optInt("shareVersion"),
                 )
             },
             sellerRules = o.optJSONArray("sellerRules")?.objects()?.map {

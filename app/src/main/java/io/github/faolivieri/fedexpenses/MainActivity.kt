@@ -2,6 +2,11 @@ package io.github.faolivieri.fedexpenses
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import io.github.faolivieri.fedexpenses.ui.ShareActions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -63,6 +68,16 @@ class MainActivity : ComponentActivity() {
                 timestamp = intent.getLongExtra(EXTRA_TIMESTAMP, 0),
                 accountId = intent.getLongExtra(EXTRA_ACCOUNT_ID, 0),
             )
+            else -> if (intent != null) lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) { ShareActions.fromIntent(this@MainActivity, intent) }
+                    ?: return@launch
+                result.onSuccess {
+                    container.incomingShare.value = it
+                    pendingRoute.value = Routes.RECEIVE
+                }.onFailure {
+                    Toast.makeText(this@MainActivity, it.message ?: "Not a Fedexpenses share", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 

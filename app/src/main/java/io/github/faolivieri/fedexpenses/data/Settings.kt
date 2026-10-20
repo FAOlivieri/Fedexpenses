@@ -50,6 +50,19 @@ class Settings(context: Context) {
         get() = prefs.getInt("theme_background_color", 0xFF8D6E63.toInt())
         set(v) = prefs.edit().putInt("theme_background_color", v).apply()
 
+    /** This phone's identity when sharing expenses; created on first use. */
+    val myId: String
+        get() = prefs.getString("my_id", null) ?: java.util.UUID.randomUUID().toString().also {
+            prefs.edit().putString("my_id", it).apply()
+        }
+
+    fun restoreMyId(id: String) = prefs.edit().putString("my_id", id).apply()
+
+    /** The name other people see on what you share. */
+    var myNickname: String
+        get() = prefs.getString("my_nickname", "") ?: ""
+        set(v) = prefs.edit().putString("my_nickname", v).apply()
+
     /** Emits whenever any setting changes, so screens can refresh. */
     fun changes(): Flow<Unit> = callbackFlow {
         val l = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> trySend(Unit) }

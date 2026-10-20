@@ -1,6 +1,20 @@
 package io.github.faolivieri.fedexpenses.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Share
+import io.github.faolivieri.fedexpenses.data.SharePayload
+import io.github.faolivieri.fedexpenses.ui.ShareActions
+import io.github.faolivieri.fedexpenses.ui.rememberNicknameGate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -56,6 +70,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -83,14 +98,30 @@ import kotlin.math.sign
 /** People you split expenses with, and what each of you owes the other. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SharingScreen(vm: MainViewModel, onOpenPerson: (Long) -> Unit) {
+fun SharingScreen(vm: MainViewModel, onOpenPerson: (Long) -> Unit, onReceive: () -> Unit) {
     val people by vm.people.collectAsStateWithLifecycle()
     val ledger by vm.ledger.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    fun receive(r: Result<SharePayload>) {
+        r.onSuccess { vm.incomingShare.value = it; onReceive() }
+            .onFailure { Toast.makeText(context, it.message ?: "Not a Fedexpenses share", Toast.LENGTH_LONG).show() }
+    }
+    val openFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch { receive(withContext(Dispatchers.IO) { ShareActions.read(context, uri) }) }
+    }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Sharing") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Sharing") },
+                actions = {
+                    IconButton(onClick = { openFile.launch(arrayOf("*/*")) }) { Icon(Icons.Filled.FileOpen, "Open a shared file") }
+                },
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { adding = true }) { Icon(Icons.Filled.PersonAdd, "Add person") }
         },
@@ -135,16 +166,40 @@ fun PersonScreen(vm: MainViewModel, personId: Long, onOpenTransaction: (Long) ->
     var editing by remember { mutableStateOf(false) }
     var settling by remember { mutableStateOf<Settlement?>(null) }
     var newSettlement by remember { mutableStateOf(false) }
+    /** Expenses selected for sharing (long-press to start). */
+    var selected by remember { mutableStateOf(setOf<Long>()) }
+    val expenseIds = entries.filterIsInstance<SharedEntry.Expense>().map { it.tx.id }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val withNickname = rememberNicknameGate(vm)
+    BackHandler(enabled = selected.isNotEmpty()) { selected = emptySet() }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
-                title = { Text(person.nickname, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                actions = { IconButton(onClick = { editing = true }) { Icon(Icons.Filled.Edit, "Edit person") } },
-            )
+            if (selected.isNotEmpty()) {
+                TopAppBar(
+                    navigationIcon = { IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Filled.Close, "Cancel selection") } },
+                    title = { Text("${selected.size} selected") },
+                    actions = {
+                        IconButton(onClick = { selected = expenseIds.toSet() }) { Icon(Icons.Filled.SelectAll, "Select all") }
+                        IconButton(onClick = {
+                            val ids = selected.toList()
+                            withNickname { vm.share(context, personId, ids); selected = emptySet() }
+                        }) { Icon(Icons.Filled.Share, "Share with ${person.nickname}") }
+                    },
+                )
+            } else {
+                TopAppBar(
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                    title = { Text(person.nickname, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    actions = {
+                        if (expenseIds.isNotEmpty()) IconButton(onClick = { withNickname { vm.share(context, personId, expenseIds) } }) {
+                            Icon(Icons.Filled.Share, "Share everything with ${person.nickname}")
+                        }
+                        IconButton(onClick = { editing = true }) { Icon(Icons.Filled.Edit, "Edit person") }
+                    },
+                )
+            }
         },
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 24.dp)) {
@@ -164,13 +219,19 @@ fun PersonScreen(vm: MainViewModel, personId: Long, onOpenTransaction: (Long) ->
                     is SharedEntry.Starting -> "start"
                 }
             }) { e ->
-                EntryRow(e, person, onClick = {
-                    when (e) {
-                        is SharedEntry.Expense -> onOpenTransaction(e.tx.id)
-                        is SharedEntry.Payment -> settling = e.settlement
-                        is SharedEntry.Starting -> editing = true
-                    }
-                })
+                val txId = (e as? SharedEntry.Expense)?.tx?.id
+                fun toggle(id: Long) { selected = if (id in selected) selected - id else selected + id }
+                EntryRow(
+                    e, person, people, selected = txId != null && txId in selected,
+                    onLongClick = txId?.let { { toggle(it) } },
+                    onClick = {
+                        when (e) {
+                            is SharedEntry.Expense -> if (selected.isNotEmpty()) toggle(e.tx.id) else onOpenTransaction(e.tx.id)
+                            is SharedEntry.Payment -> settling = e.settlement
+                            is SharedEntry.Starting -> editing = true
+                        }
+                    },
+                )
             }
         }
     }
@@ -207,12 +268,19 @@ fun PersonScreen(vm: MainViewModel, personId: Long, onOpenTransaction: (Long) ->
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun EntryRow(e: SharedEntry, person: Person, onClick: () -> Unit) {
+private fun EntryRow(
+    e: SharedEntry, person: Person, people: List<Person>, selected: Boolean, onLongClick: (() -> Unit)?,
+    onClick: () -> Unit,
+) {
     val nickname = person.nickname
     val money = LocalMoneyColors.current
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth()
+            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -231,7 +299,7 @@ private fun EntryRow(e: SharedEntry, person: Person, onClick: () -> Unit) {
                     val payer = when (e.tx.paidBy) {
                         null -> "you paid"
                         person.id -> "$nickname paid"
-                        else -> "someone else paid"
+                        else -> (people.firstOrNull { it.id == e.tx.paidBy }?.nickname ?: "someone else") + " paid"
                     }
                     name to "Total ${Money.format(e.tx.amountCents)} · $payer · their part ${Money.format(e.theirCents)}"
                 }
@@ -421,4 +489,66 @@ private fun SettleDialog(
             dismissButton = { TextButton(onClick = { pickingDate = false }) { Text("Cancel") } },
         ) { DatePicker(state) }
     }
+}
+
+/** Splits [count] expenses equally between you and the chosen people, and records who paid. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun SplitManyDialog(count: Int, people: List<Person>, onDismiss: () -> Unit, onApply: (List<Long>, Long?) -> Unit) {
+    var chosen by remember { mutableStateOf(listOf<Long>()) }
+    var payer by remember { mutableStateOf<Long?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (count == 1) "Split 1 expense" else "Split $count expenses") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (people.isEmpty()) {
+                    Text("Add people in the Sharing tab first.")
+                } else {
+                    Text("Equally between you and:", style = MaterialTheme.typography.labelLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        people.forEach { p ->
+                            FilterChip(p.id in chosen, {
+                                chosen = if (p.id in chosen) chosen - p.id else chosen + p.id
+                                if (payer != null && payer !in chosen) payer = null
+                            }, label = { Text(p.nickname) })
+                        }
+                    }
+                    if (chosen.isNotEmpty()) {
+                        Text("Paid by", style = MaterialTheme.typography.labelLarge)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(payer == null, { payer = null }, label = { Text("You") })
+                            people.filter { it.id in chosen }.forEach { p ->
+                                FilterChip(payer == p.id, { payer = p.id }, label = { Text(p.nickname) })
+                            }
+                        }
+                    }
+                    Text("Choosing nobody removes the split.", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = people.isNotEmpty(), onClick = { onApply(chosen, payer) }) { Text("Apply") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Asks which of [people] to share with. */
+@Composable
+fun ChoosePersonDialog(people: List<Person>, onDismiss: () -> Unit, onChoose: (Person) -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Share with") },
+        text = {
+            Column {
+                people.forEach { p ->
+                    Text(p.nickname, style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.fillMaxWidth().clickable { onChoose(p) }.padding(vertical = 12.dp))
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

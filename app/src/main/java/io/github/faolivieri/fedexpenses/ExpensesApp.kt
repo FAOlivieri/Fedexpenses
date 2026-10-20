@@ -12,6 +12,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import io.github.faolivieri.fedexpenses.data.SharePayload
 import io.github.faolivieri.fedexpenses.work.RecurringAlarm
 
 /**
@@ -22,9 +24,11 @@ class AppContainer(context: Context) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val settings = Settings(context)
     val db: AppDatabase by lazy { AppDatabase.build(context) }
-    val repo: Repository by lazy { Repository(db) }
+    val repo: Repository by lazy { Repository(db, settings) }
     val notifier: TxNotifier by lazy { TxNotifier(context) }
     val processor: NotificationProcessor by lazy { NotificationProcessor(repo, notifier, appScope) }
+    /** A share received from another phone, waiting to be reviewed. */
+    val incomingShare = MutableStateFlow<SharePayload?>(null)
 }
 
 class ExpensesApp : Application() {
