@@ -27,6 +27,29 @@ class SplitsTest {
         assertEquals(Splits.WHOLE, Splits.equal(7).sum())
     }
 
+    @Test fun amountsComeBackFromBasisPoints() {
+        val ids = listOf<Long?>(null, ana, marko)
+        fun roundTrip(amounts: List<Long>, payer: Int): List<Long> {
+            val bp = Splits.fromAmounts(amounts, payer)!!
+            assertEquals(Splits.WHOLE, bp.sum())
+            val parts = Splits.parts(amounts.sum(), ids.zip(bp).map { (p, b) -> SplitPart(transactionId = 1, personId = p, basisPoints = b) }, ids[payer])
+            return ids.map { parts.getValue(it) }
+        }
+        for (total in listOf(1L, 7L, 999L, 1000L, 4321L, 9999L, 10000L)) {
+            for (a in 0..total step maxOf(1, total / 37)) for (b in 0..(total - a) step maxOf(1, total / 41)) {
+                val amounts = listOf(a, b, total - a - b)
+                for (payer in 0..2) assertEquals(amounts, roundTrip(amounts, payer))
+            }
+        }
+        // Larger totals: every part within half a basis point of the total, the total exact.
+        val big = listOf(4730L, 2L, 32_789L)
+        val got = roundTrip(big, 0)
+        assertEquals(big.sum(), got.sum())
+        got.zip(big).drop(1).forEach { (g, w) -> assert(kotlin.math.abs(g - w) <= big.sum() / 20_000 + 1) }
+        assertEquals(listOf(0, 10000, 0), Splits.fromAmounts(listOf(0, 5, 0), 0))
+        assertEquals(null, Splits.fromAmounts(listOf(0, 0), 0))
+    }
+
     @Test fun roundingRemainderGoesToThePayer() {
         val s = split(1, null to 3334, ana to 3333, marko to 3333)
         val paidByMe = Splits.parts(1000, s, null)

@@ -47,6 +47,24 @@ object Splits {
         return parts
     }
 
+    /**
+     * Basis points for parts given in cents, in the same order, adding up to [WHOLE]; null if they add up to 0.
+     * [parts] turns them back into the same amounts for totals up to 100.00; on larger totals each part can be
+     * off by half a basis point of the total, and the participant at [keyIndex] (the payer) takes the difference.
+     */
+    fun fromAmounts(cents: List<Long>, keyIndex: Int): List<Int>? {
+        val total = cents.sum()
+        if (total <= 0) return null
+        val bp = cents.map { ((it * WHOLE * 2 + total) / (2 * total)).toInt() }.toMutableList()
+        bp[keyIndex] = 0
+        bp[keyIndex] = WHOLE - bp.sum()
+        while (bp[keyIndex] < 0) {
+            bp[bp.indices.maxBy { bp[it] }]--
+            bp[keyIndex]++
+        }
+        return bp
+    }
+
     fun mine(tx: Transaction, splits: List<SplitPart>): Long =
         if (splits.isEmpty()) tx.amountCents else parts(tx.amountCents, splits, tx.paidBy)[null] ?: 0
 

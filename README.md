@@ -99,7 +99,7 @@ When adding or editing a transaction, set **Repeat** to weekly, monthly or yearl
 
 The **Sharing** tab lists the people you split expenses with and what each of you owes the other. Tap **+** to add someone.
 
-- **Splitting**: in an expense's editor, pick people under **Split with**. The amount is divided equally between them and you; change any percentage, and pick who paid. **Your share** appears under the amount.
+- **Splitting**: in an expense's editor, pick people under **Split with**. The amount is divided equally between them and you; change any percentage (or switch from **%** to **€** to enter what each person used as an amount), and pick who paid. **Your share** appears under the amount.
 - **Reports, Overview and the Transactions list** count only your share; a split transaction shows the total, who it was shared with and who paid underneath. An account's balance changes only when you paid; an expense someone else paid doesn't touch it.
 - **Starting balance**: when adding or editing a person, enter what you already owed each other before tracking it here (e.g. from another app). It counts in the balance only, never in accounts or reports.
 - **Settle up**: open a person and tap **Settle up** to record money paid between you, for the full balance or any part of it, on any date. It moves the balance and the chosen account, without counting as spending or income.
